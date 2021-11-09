@@ -1,0 +1,22 @@
+{
+  "files": {
+    "main.css": "/s/css/c_main.b.css",
+    "main.js": "/s/js/main.3.js",
+    "main.js.map": "/s/js/main.3.js.map",
+    "runtime-main.js": "/s/js/runtime-main.2.js",
+    "runtime-main.js.map": "/s/js/runtime-main.2.js.map",
+    "s/js/2.6.js": "/s/js/2.6.js",
+    "s/js/2.6.js.map": "/s/js/2.6.js.map",
+    "index.html": "/index.html",
+    "precache-manifest.173f160cdf4ef11cfcd6680cdf78ef17.js": "/precache-manifest.173f160cdf4ef11cfcd6680cdf78ef17.js",
+    "s/css/c_main.b.css.map": "/s/css/c_main.b.css.map",
+    "s/js/2.6.js.LICENSE.txt": "/s/js/2.6.js.LICENSE.txt",
+    "service-worker.js": "/service-worker.js"
+  },
+  "entrypoints": [
+    "s/js/runtime-main.2.js",
+    "s/js/2.6.js",
+    "s/css/c_main.b.css",
+    "s/js/main.3.js"
+  ]
+}
