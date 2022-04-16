@@ -18,6 +18,7 @@ private:
     uint _string_boundaries[max_matrices];
     Vector<uint> string_boundaries;
 
+    uint8_t brightness {32};
 
     int32_t lookupStringIndex(uint32_t row) {
         uint32_t cur_idx = 0;
@@ -91,7 +92,13 @@ public:
     }
 
     void show() {
-        // Call FastLED.show() in main loop
+        for (auto &matrixString: matrix_strings) {
+            matrixString.show(brightness);
+        }
+    }
+
+    void setBrightness(uint8_t scale) {
+        brightness = scale;
     }
 
     void clear() {

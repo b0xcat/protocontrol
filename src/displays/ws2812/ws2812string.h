@@ -13,17 +13,16 @@ static const uint32_t max_matrices = 64;
 class WS2812String : public Adafruit_GFX {
     friend class WS2812Display;
 
+protected: 
+    CRGB* pixels;
+    uint32_t num_pixels;
+
 private:
     WS2812Matrix _matrices[max_matrices]; 
     Vector<WS2812Matrix> matrices;
 
     uint _mat_boundaries[max_matrices];
     Vector<uint> mat_boundaries;
-
-    CRGB* pixels;
-    uint32_t num_pixels;
-
-    uint8_t data_pin;
 
     int32_t lookupMatrixIndex(uint32_t row) {
         uint32_t cur_idx = 0;
@@ -37,7 +36,7 @@ private:
         return -1;
     }
 
-WS2812String(): Adafruit_GFX(0, 0), data_pin(0) {};
+WS2812String(): Adafruit_GFX(0, 0) {};
 
 public:
 
@@ -52,7 +51,7 @@ public:
      * So essentially this will represent a bounding rectangle around the input matrices
      * laid out in one long row
      */
-    WS2812String (uint8_t data_pin, std::initializer_list<WS2812Matrix> mats): Adafruit_GFX {
+    WS2812String (std::initializer_list<WS2812Matrix> mats): Adafruit_GFX {
         std::accumulate(mats.begin(), mats.end(),
                         (int16_t)0, [](int16_t a, const WS2812Matrix &mat) {
                             return a + mat.width();
@@ -61,8 +60,7 @@ public:
                         (int16_t)0, [](int16_t a, const WS2812Matrix &mat) {
                             return std::max(a, mat.height());
                         }),
-        },
-        data_pin(data_pin)
+        }
     {
 
         // Keep track off the added matrices
@@ -121,8 +119,29 @@ public:
         return pixels;
     }
 
+    virtual void show(uint8_t brightness) {}
+
     ~WS2812String() {
         delete[] pixels;
+    }
+};
+
+template <uint8_t data_pin>
+class WS2812StringPin : public WS2812String {
+    friend class WS2812Display;
+
+private:
+    CLEDController *controller;
+
+public:
+    WS2812StringPin (std::initializer_list<WS2812Matrix> mats)
+    : WS2812String(mats)
+    {
+        controller = &FastLED.addLeds<WS2812, data_pin, GRB>(pixels, num_pixels);
+    }
+
+    void show(uint8_t brightness) {
+        controller->showLeds(brightness);
     }
 };
 
