@@ -123,6 +123,14 @@ class MatrixManager {
         }
         painter.show();
     }
+
+    void draw(Adafruit_GFX &display)
+    {
+        for (uint i = 0; i < n_matrices; i++)
+        {
+            matrices[i]->display(display);
+        }
+    }
 };
 
 #endif

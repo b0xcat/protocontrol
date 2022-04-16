@@ -2,6 +2,7 @@
 #define __MATRIX_H__
 
 #include <Arduino.h>
+#include <Adafruit_GFX.h>
 #include "layer.h"
 
 class Painter;
@@ -26,11 +27,14 @@ class Matrix {
     uint width;
     uint height;
 
+    uint draw_x;
+    uint draw_y;
+
     // Holds the "framebuffer"  for this matrix
     uint8_t *data;
     uint data_size;
 
-    Matrix(String name_, uint w, uint h, uint n_layers_);
+    Matrix(String name_, uint w, uint h, uint x, uint y, uint n_layers_);
 
     uint getID();
 
@@ -47,5 +51,7 @@ class Matrix {
     void update(uint32_t deltatime);
 
     void paint(Painter &painter);
+
+    void display(Adafruit_GFX &target_display);
 };
 #endif

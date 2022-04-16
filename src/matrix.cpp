@@ -1,8 +1,11 @@
 #include "matrix.h"
 
-Matrix::Matrix(String name_, uint w, uint h, uint n_layers_) {
+Matrix::Matrix(String name_, uint w, uint h, uint x, uint y, uint n_layers_) {
     width = w;
     height = h;
+
+    draw_x = x;
+    draw_y = y;
 
     name = name_;
 
@@ -204,6 +207,30 @@ void Matrix::paint(Painter &painter)
                     this,
                     col,
                     low,
+                    high - low,
+                    color
+                );
+            }
+        }
+    }
+}
+
+void Matrix::display(Adafruit_GFX &target_display)
+{
+    for (uint i = 0; i < n_layers; i++)
+    {
+        // TODO: this is kinda inefficient, potentially quite a bit of overdraw
+        // Maybe first determine what pixels should be touched?
+        for (uint col = 0; col < width; col++) {
+            int low = layers[i]->getLow(col);
+            int high = layers[i]->getHigh(col);
+
+            if (low != -1 && high != -1) {
+                uint16_t color = layers[i]->getColor(col);
+
+                target_display.drawFastVLine(
+                    draw_x + col,
+                    draw_y + low,
                     high - low,
                     color
                 );

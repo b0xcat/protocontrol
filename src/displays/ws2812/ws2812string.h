@@ -39,10 +39,7 @@ private:
 
 
 public:
-    WS2812String(): Adafruit_GFX(0, 0) {
-        Serial.println("IN DEFAULT STRING CONSTRUCTOR");
-    };
-    // WS2812String() = delete;
+    WS2812String() = delete;
 
     /**
      * Construct a WS2812String with an initializer list of WS2812Matrix objects
@@ -66,13 +63,11 @@ public:
                         })
         }
     {
-        Serial.println("IN STRING BASE CONSTRUCTOR");
         // Keep track off the added matrices
         matrices.setStorage(_matrices);
         for (auto &matrix: mats) {
             matrices.push_back(matrix);
         }
-        Serial.println("IN STRING BASE CONSTRUCTOR matrices loop");
 
         // Calculate their (row) boundaries so we know what matrix to write to later
         mat_boundaries.setStorage(_mat_boundaries);
@@ -81,7 +76,6 @@ public:
             cur_boundary += matrix.width();
             mat_boundaries.push_back(cur_boundary);
         }
-        Serial.println("IN STRING BASE CONSTRUCTOR boundaries loop");
 
         // Setup FastLED stuff
         num_pixels = std::accumulate(mats.begin(), mats.end(), 0, 
@@ -94,7 +88,6 @@ public:
             matrix.fastled_mem = &pixels[cur_pixel];
             cur_pixel += (uint32_t)matrix.height() * (uint32_t)matrix.width();
         }
-        Serial.println("IN STRING BASE CONSTRUCTOR END");
     }
 
     void drawPixel(int16_t x, int16_t y, uint16_t color) {
@@ -147,16 +140,17 @@ public:
     WS2812StringPin (std::initializer_list<WS2812Matrix> mats)
     : WS2812String(mats)
     {
-        Serial.println("IN STRING PIN CONSTRUCTOR");
         controller = &FastLED.addLeds<WS2812, data_pin, GRB>(pixels, num_pixels);
     }
 
     void show(uint8_t brightness) override {
-        Serial.print("SHOW WITH ");
-        Serial.print(brightness);
-        Serial.println(" BRIGHTNESS");
         controller->showLeds(brightness);
     }
 };
+
+// template <uint8_t data_pin>
+// WS2812StringPin<data_pin>* WS2812String(std::initializer_list<WS2812Matrix> mats) {
+//     return new WS2812StringPin<data_pin>(mats);
+// }
 
 #endif

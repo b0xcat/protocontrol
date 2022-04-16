@@ -13,12 +13,7 @@ static const uint32_t max_matrix_strings = 8;
 class WS2812Display : public Adafruit_GFX {
 private:
     std::vector<std::unique_ptr<WS2812String>> matrix_strings;
-    
-    // std::unique_ptr<WS2812String> _matrix_strings[max_matrix_strings]; 
-    // Vector<std::unique_ptr<WS2812String>> matrix_strings;
-
-    uint _string_boundaries[max_matrices];
-    Vector<uint> string_boundaries;
+    std::vector<uint32_t> string_boundaries;
 
     uint8_t brightness {32};
     
@@ -35,13 +30,10 @@ private:
     }
 
 public:
-
     /**
      * Do not allow default constructor
      */
-    // WS2812Display(std::initializer_list<WS2812String> ints) : Adafruit_GFX(0, 0) {
-    //     Serial.println("DEFAULT DISPLAY CONSTRUCTOR");
-    // }
+    WS2812Display() = delete;
 
     /**
      * Construct a WS2812Display with an initializer list of WS2812String objects
@@ -64,25 +56,17 @@ public:
                             return std::max(a, mat->height());
                         }),
     } {
-        Serial.println("IN DISPLAY CONSTRUCTOR");
         // Keep track off the added matrices
-        // matrix_strings.setStorage(_matrix_strings);
-        Serial.println("IN DISPLAY CONSTRUCTOR set storage");
-
         for (auto &string : strings) {
             matrix_strings.push_back(std::unique_ptr<WS2812String>(string));
         }
-        Serial.println("IN DISPLAY CONSTRUCTOR push back strings");
 
         // Calculate their (row) boundaries so we know what string to write to later
-        string_boundaries.setStorage(_string_boundaries);
-        Serial.println("IN DISPLAY CONSTRUCTOR set storage boundaries");
         uint cur_boundary = 0;
         for (auto& matrix_string : matrix_strings) {
             cur_boundary += matrix_string->width();
             string_boundaries.push_back(cur_boundary);
         }
-        Serial.println("IN DISPLAY CONSTRUCTOR loop boundaries");
     }
 
     void drawPixel(int16_t x, int16_t y, uint16_t color) {
@@ -101,11 +85,16 @@ public:
     }
 
     void show() {
-        Serial.println("Display show called");
+        // FastLED.setBrightness(16);
+        unsigned long before = micros();
         for (auto &matrixString: matrix_strings) {
-            Serial.println("MATRIXSTRING SHOW");
             matrixString->show(brightness);
         }
+        // FastLED.show();
+        unsigned long after = micros();
+        Serial.print("FASTLED TOOK: ");
+        Serial.print(after - before);
+        Serial.println(" us");
     }
 
     void setBrightness(uint8_t scale) {
