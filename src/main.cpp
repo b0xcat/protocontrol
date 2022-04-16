@@ -27,21 +27,19 @@
 
 // Define the layout of our physical display
 WS2812Display display{
-    WS2812String{16,
-        {
+    WS2812String { 16, {
             WS2812Matrix(16, 8, 0),
             WS2812Matrix(32, 8, 0),
             WS2812Matrix(8, 8, 0),
-        }
-    },
-    WS2812String{17,
-        {
+    }},
+    WS2812String { 17, {
             WS2812Matrix(16, 8, 0),
             WS2812Matrix(32, 8, 0),
             WS2812Matrix(8, 8, 0),
-        }
-    }
+    }}
 };
+
+// WS2812Matrix<17> testmatrix(16, 8, 0);
 
 // // Internal, hardware agnostic representation of the matrices
 // // Basically just specialized bitmaps with some convenience functions
@@ -145,15 +143,19 @@ void setup()
   // matrixmanager.setFrame(framebuffer);
 
   // Add the matrix strings from the display to fastled
-  for (auto tuple : display.getBuffers())
-  {
-    CRGB *buf = std::get<0>(tuple);
-    ssize_t buf_len = std::get<1>(tuple);
-    const uint8_t data_pin = std::get<2>(tuple);
-    LEDS.addLeds<WS2812, data_pin, GRB>(buf, buf_len);
-  }
-
-  LEDS.setBrightness(32);
+  // for (auto tuple : display.getBuffers())
+  // {
+  //   CRGB *buf = std::get<0>(tuple);
+  //   ssize_t buf_len = std::get<1>(tuple);
+  //   const uint8_t data_pin = std::get<2>(tuple);
+  //   LEDS.addLeds<WS2812, data_pin, GRB>(buf, buf_len);
+  // }
+  
+  // auto tuples = display.getBuffers();
+  // LEDS.addLeds<WS2812, 16, GRB>(std::get<0>(tuples[0]), std::get<1>(tuples[0]));
+  // LEDS.addLeds<WS2812, 17, GRB>(std::get<0>(tuples[1]), std::get<1>(tuples[1]));
+  // LEDS.addLeds<WS2812, 17, GRB>(testmatrix.fastled_mem, 16*8);
+  // LEDS.setBrightness(32);
 
   Serial.println("Setup complete");
 }
@@ -168,10 +170,10 @@ void setup()
 
 void loop()
 {
-  display.fillScreen(fromRGB(255, 0, 0));
-  sleep(1000);
-  display.clear();
-  sleep(1000);
+  // display.fillScreen(fromRGB(255, 0, 0));
+  // sleep(1000);
+  // display.clear();
+  // sleep(1000);
   // uint32_t now = millis();
 
   // // Handle overflow, update next loop

@@ -23,7 +23,7 @@ private:
     CRGB* pixels;
     uint32_t num_pixels;
 
-    const uint8_t data_pin;
+    uint8_t data_pin;
 
     int32_t lookupMatrixIndex(uint32_t row) {
         uint32_t cur_idx = 0;
@@ -54,11 +54,11 @@ public:
      */
     WS2812String (uint8_t data_pin, std::initializer_list<WS2812Matrix> mats): Adafruit_GFX {
         std::accumulate(mats.begin(), mats.end(),
-                        0, [](int16_t a, WS2812Matrix &mat) {
+                        (int16_t)0, [](int16_t a, const WS2812Matrix &mat) {
                             return a + mat.width();
                         }),
         std::accumulate(mats.begin(), mats.end(),
-                        0, [](int16_t a, WS2812Matrix &mat) {
+                        (int16_t)0, [](int16_t a, const WS2812Matrix &mat) {
                             return std::max(a, mat.height());
                         }),
         },
@@ -67,7 +67,10 @@ public:
 
         // Keep track off the added matrices
         matrices.setStorage(_matrices);
-        matrices.fill(mats);
+        for (auto &matrix: mats) {
+            matrices.push_back(matrix);
+        }
+        
 
         // Calculate their (row) boundaries so we know what matrix to write to later
         mat_boundaries.setStorage(_mat_boundaries);
@@ -79,7 +82,7 @@ public:
 
         // Setup FastLED stuff
         num_pixels = std::accumulate(mats.begin(), mats.end(), 0, 
-                                [](uint32_t n_pixels, WS2812Matrix &mat) {
+                                [](uint32_t n_pixels, const WS2812Matrix &mat) {
                                     return n_pixels + ((uint32_t)mat.width() * (uint32_t)mat.height());
                                 });
         pixels = new CRGB[num_pixels];

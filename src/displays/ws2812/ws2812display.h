@@ -51,17 +51,19 @@ public:
      */
     WS2812Display (std::initializer_list<WS2812String> strings): Adafruit_GFX {
         std::accumulate(strings.begin(), strings.end(),
-                        0, [](int16_t a, WS2812String &mat) {
+                        (int16_t)0, [](int16_t a, const WS2812String &mat) {
                             return a + mat.width();
                         }),
         std::accumulate(strings.begin(), strings.end(),
-                        0, [](int16_t a, WS2812String &mat) {
+                        (int16_t)0, [](int16_t a, const WS2812String &mat) {
                             return std::max(a, mat.height());
                         }),
     } {
         // Keep track off the added matrices
         matrix_strings.setStorage(_matrix_strings);
-        matrix_strings.fill(strings);
+        for (auto &string : strings) {
+            matrix_strings.push_back(string);
+        }
 
         // Calculate their (row) boundaries so we know what string to write to later
         string_boundaries.setStorage(_string_boundaries);
@@ -96,18 +98,6 @@ public:
         for (auto &matrixString: matrix_strings) {
             matrixString.fillScreen(0);
         }
-    }
-
-    std::vector<std::tuple<CRGB*, ssize_t, const uint8_t>> getBuffers() {
-        std::vector<std::tuple<CRGB*, ssize_t, const uint8_t>> buffers(matrix_strings.size());
-        for (auto &matrix_string : matrix_strings) {
-            buffers.push_back(std::tuple<CRGB*, ssize_t, const uint8_t> {
-                matrix_string.getBuffer(),
-                matrix_string.num_pixels,
-                matrix_string.data_pin
-            });
-        }
-        return buffers;
     }
 
 };
