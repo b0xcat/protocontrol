@@ -8,7 +8,7 @@
 
 #include "ws2812matrix.h"
 
-static const uint32_t max_matrices = 64;
+static const uint32_t max_matrices = 8;
 
 class WS2812String : public Adafruit_GFX {
     friend class WS2812Display;
@@ -27,7 +27,7 @@ private:
     int32_t lookupMatrixIndex(uint32_t row) {
         uint32_t cur_idx = 0;
         for(auto cur_boundary : mat_boundaries) {
-            if (row <= cur_boundary){ // or < ?
+            if (row < cur_boundary){ // or < ?
                 return cur_idx;
             } else {
                 cur_idx += 1;
@@ -36,9 +36,13 @@ private:
         return -1;
     }
 
-WS2812String(): Adafruit_GFX(0, 0) {};
+
 
 public:
+    WS2812String(): Adafruit_GFX(0, 0) {
+        Serial.println("IN DEFAULT STRING CONSTRUCTOR");
+    };
+    // WS2812String() = delete;
 
     /**
      * Construct a WS2812String with an initializer list of WS2812Matrix objects
@@ -59,16 +63,16 @@ public:
         std::accumulate(mats.begin(), mats.end(),
                         (int16_t)0, [](int16_t a, const WS2812Matrix &mat) {
                             return std::max(a, mat.height());
-                        }),
+                        })
         }
     {
-
+        Serial.println("IN STRING BASE CONSTRUCTOR");
         // Keep track off the added matrices
         matrices.setStorage(_matrices);
         for (auto &matrix: mats) {
             matrices.push_back(matrix);
         }
-        
+        Serial.println("IN STRING BASE CONSTRUCTOR matrices loop");
 
         // Calculate their (row) boundaries so we know what matrix to write to later
         mat_boundaries.setStorage(_mat_boundaries);
@@ -77,6 +81,7 @@ public:
             cur_boundary += matrix.width();
             mat_boundaries.push_back(cur_boundary);
         }
+        Serial.println("IN STRING BASE CONSTRUCTOR boundaries loop");
 
         // Setup FastLED stuff
         num_pixels = std::accumulate(mats.begin(), mats.end(), 0, 
@@ -89,6 +94,7 @@ public:
             matrix.fastled_mem = &pixels[cur_pixel];
             cur_pixel += (uint32_t)matrix.height() * (uint32_t)matrix.width();
         }
+        Serial.println("IN STRING BASE CONSTRUCTOR END");
     }
 
     void drawPixel(int16_t x, int16_t y, uint16_t color) {
@@ -119,11 +125,15 @@ public:
         return pixels;
     }
 
-    virtual void show(uint8_t brightness) {}
-
-    ~WS2812String() {
-        delete[] pixels;
+    virtual void show(uint8_t brightness) {
+        Serial.println("Called wrong show :(");
     }
+
+    // TODO: figure out why uncommenting this breaks things horribly
+    // For now, just pretend this is not a potential memory leak
+    // ~WS2812String() {
+    //     delete[] pixels;
+    // }
 };
 
 template <uint8_t data_pin>
@@ -137,10 +147,14 @@ public:
     WS2812StringPin (std::initializer_list<WS2812Matrix> mats)
     : WS2812String(mats)
     {
+        Serial.println("IN STRING PIN CONSTRUCTOR");
         controller = &FastLED.addLeds<WS2812, data_pin, GRB>(pixels, num_pixels);
     }
 
-    void show(uint8_t brightness) {
+    void show(uint8_t brightness) override {
+        Serial.print("SHOW WITH ");
+        Serial.print(brightness);
+        Serial.println(" BRIGHTNESS");
         controller->showLeds(brightness);
     }
 };

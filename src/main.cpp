@@ -26,18 +26,19 @@
 #define N_LAYERS 4
 
 // Define the layout of our physical display
-WS2812Display display{
-    WS2812StringPin<16> {
+WS2812Display display {
+    new WS2812StringPin<16> {
             WS2812Matrix(16, 8, 0),
             WS2812Matrix(32, 8, 0),
             WS2812Matrix(8, 8, 0),
     },
-    WS2812StringPin<17> {
+    new WS2812StringPin<17> {
             WS2812Matrix(16, 8, 0),
             WS2812Matrix(32, 8, 0),
             WS2812Matrix(8, 8, 0),
     }
 };
+// WS2812Display *display;
 
 // WS2812Matrix<17> testmatrix(16, 8, 0);
 
@@ -87,7 +88,18 @@ WS2812Display display{
 void setup()
 {
   esp_log_level_set("*", ESP_LOG_VERBOSE);
-  Serial.begin(921600);
+  Serial.begin(115200);
+  Serial.println("IN SETUP");
+
+  // display = new WS2812Display { 
+  //     WS2812String {
+  //         WS2812Matrix(16, 8, 0),
+  //         WS2812Matrix(32, 8, 0),
+  //         WS2812Matrix(8, 8, 0),
+  //     }
+  // };
+
+  Serial.println("RETURN FROM CONSTRUCTOR");
 
   // // Init Storage
   // if (!SPIFFS.begin())
@@ -155,7 +167,7 @@ void setup()
   // LEDS.addLeds<WS2812, 16, GRB>(std::get<0>(tuples[0]), std::get<1>(tuples[0]));
   // LEDS.addLeds<WS2812, 17, GRB>(std::get<0>(tuples[1]), std::get<1>(tuples[1]));
   // LEDS.addLeds<WS2812, 17, GRB>(testmatrix.fastled_mem, 16*8);
-  display.setBrightness(32);
+  display.setBrightness(16);
 
   Serial.println("Setup complete");
 }
@@ -170,12 +182,13 @@ void setup()
 
 void loop()
 {
+  Serial.println("IN LOOP");
   display.fillScreen(fromRGB(255, 0, 0));
   display.show();
-  sleep(1000);
+  delay(1000);
   display.clear();
   display.show();
-  sleep(1000);
+  delay(1000);
   // uint32_t now = millis();
 
   // // Handle overflow, update next loop
