@@ -1,28 +1,27 @@
-#ifndef __WS2812_PAINTER_H__
-#define __WS2812_PAINTER_H__
+#ifndef __WS2812_DISPLAY_H__
+#define __WS2812_DISPLAY_H__
 
 #include <Adafruit_GFX.h>
 #include <FastLED.h>
 #include <initializer_list>
 #include <Vector.h>
 
-#include "ws2812matrix.h"
+#include "ws2812string.h"
 
-static const uint32_t max_matrices = 64;
+static const uint32_t max_matrix_strings = 8;
 
 class WS2812Display : public Adafruit_GFX {
 private:
-    WS2812Matrix _matrices[max_matrices]; 
-    Vector<WS2812Matrix> matrices;
+    WS2812String _matrix_strings[max_matrix_strings]; 
+    Vector<WS2812String> matrix_strings;
 
-    uint _mat_boundaries[max_matrices];
-    Vector<uint> mat_boundaries;
+    uint _string_boundaries[max_matrices];
+    Vector<uint> string_boundaries;
 
-    CRGB* pixels;
 
-    int32_t lookupMatrixIndex(uint32_t row) {
+    int32_t lookupStringIndex(uint32_t row) {
         uint32_t cur_idx = 0;
-        for(auto cur_boundary : mat_boundaries) {
+        for(auto cur_boundary : string_boundaries) {
             if (row <= cur_boundary){ // or < ?
                 return cur_idx;
             } else {
@@ -40,76 +39,53 @@ public:
     WS2812Display() = delete;
 
     /**
-     * Construct a WS2812Display with an initializer list of WS2812Matrix objects
+     * Construct a WS2812Display with an initializer list of WS2812String objects
      * 
      * The display width of the WS2812Display will be equal to the sum of the width of the
-     * matrix objects
+     * matrix objects in the strings
      * 
      * The display height will be equal to the max height of the matrices.
      * 
      * So essentially this will represent a bounding rectangle around the input matrices
      * laid out in one long row
      */
-    WS2812Display (std::initializer_list<WS2812Matrix> mats): Adafruit_GFX {
-        std::accumulate(mats.begin(), mats.end(),
-                        0, [](int16_t a, WS2812Matrix &mat) {
+    WS2812Display (std::initializer_list<WS2812String> strings): Adafruit_GFX {
+        std::accumulate(strings.begin(), strings.end(),
+                        0, [](int16_t a, WS2812String &mat) {
                             return a + mat.width();
                         }),
-        std::accumulate(mats.begin(), mats.end(),
-                        0, [](int16_t a, WS2812Matrix &mat) {
+        std::accumulate(strings.begin(), strings.end(),
+                        0, [](int16_t a, WS2812String &mat) {
                             return std::max(a, mat.height());
                         }),
     } {
         // Keep track off the added matrices
-        matrices.setStorage(_matrices);
-        matrices.fill(mats);
+        matrix_strings.setStorage(_matrix_strings);
+        matrix_strings.fill(strings);
 
-        // Calculate their (row) boundaries so we know what matrix to write to later
-        mat_boundaries.setStorage(_mat_boundaries);
+        // Calculate their (row) boundaries so we know what string to write to later
+        string_boundaries.setStorage(_string_boundaries);
         uint cur_boundary = 0;
-        for (auto& matrix : matrices) {
-            cur_boundary += matrix.width();
-            mat_boundaries.push_back(cur_boundary);
-        }
-
-        // Setup FastLED stuff
-        uint32_t num_pixels = std::accumulate(mats.begin(), mats.end(), 0, 
-                                [](uint32_t n_pixels, WS2812Matrix &mat) {
-                                    return n_pixels + ((uint32_t)mat.width() * (uint32_t)mat.height());
-                                });
-        pixels = new CRGB[num_pixels];
-        uint32_t cur_pixel = 0;
-        for (auto& matrix : matrices) {
-            matrix.fastled_mem = &pixels[cur_pixel];
-            cur_pixel += (uint32_t)matrix.height() * (uint32_t)matrix.width();
+        for (auto& matrix_string : matrix_strings) {
+            cur_boundary += matrix_string.width();
+            string_boundaries.push_back(cur_boundary);
         }
     }
 
-    ~WS2812Display() {
-        delete[] pixels;
-    }
 
-    void drawPixel(uint16_t x, uint16_t y, uint16_t color) {
-        // Serial.println("DRAWING PIXEL");
-        // Check what matrix we should draw to
-        int32_t matidx = lookupMatrixIndex(x);
+    void drawPixel(int16_t x, int16_t y, uint16_t color) {
+        int32_t stringidx = lookupStringIndex(x);
         
-        if (matidx < 0) {
+        if (stringidx < 0) {
             return;
         }
-  
-        // TODO: COLOR SUPPORT
-        if (color != 0) {
-            color = 0xF800;
-        }
 
-        // Look up the lower boundary for this matrix
         uint prev_boundary = 0;
-        if (matidx > 0 ){
-            prev_boundary = mat_boundaries[matidx - 1];
+        if (stringidx > 0 ){
+            prev_boundary = string_boundaries[stringidx - 1];
         } 
 
-        matrices[matidx].drawPixel(x - prev_boundary, y, color);
+        matrix_strings[stringidx].drawPixel(x - prev_boundary, y, color);
     }
 
     void show() {
@@ -117,13 +93,21 @@ public:
     }
 
     void clear() {
-        for (auto &matrix: matrices) {
-            matrix.fillScreen(0);
+        for (auto &matrixString: matrix_strings) {
+            matrixString.fillScreen(0);
         }
     }
 
-    CRGB* getBuffer() {
-        return pixels;
+    std::vector<std::tuple<CRGB*, ssize_t, const uint8_t>> getBuffers() {
+        std::vector<std::tuple<CRGB*, ssize_t, const uint8_t>> buffers(matrix_strings.size());
+        for (auto &matrix_string : matrix_strings) {
+            buffers.push_back(std::tuple<CRGB*, ssize_t, const uint8_t> {
+                matrix_string.getBuffer(),
+                matrix_string.num_pixels,
+                matrix_string.data_pin
+            });
+        }
+        return buffers;
     }
 
 };

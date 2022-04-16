@@ -10,7 +10,7 @@
 #define MAT_H 8
 
 class WS2812Matrix : public Adafruit_GFX {
-    friend class WS2812Display;
+    friend class WS2812String;
 private:
     CRGB *fastled_mem;
 
@@ -30,6 +30,11 @@ public:
         // Bounds check
         if ((x < 0) || (y < 0) || (x >= _width) || (y >= _height)) {
             return;
+        }
+
+        // TODO: COLOR SUPPORT
+        if (color != 0) {
+            color = 0xF800;
         }
 
         // What "physical" matrix are we in?

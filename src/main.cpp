@@ -6,6 +6,7 @@
 #include <FS.h>
 #include <SPIFFS.h>
 #include <stdint.h>
+#include <FastLED.h>
 // #include "AsyncJson.h"
 // #include "ArduinoJson.h"
 // #include "wifi_credentials.h"
@@ -16,6 +17,7 @@
 // #include "max7219painter.h"
 #include "displays/ws2812/ws2812display.h"
 #include "displays/ws2812/ws2812matrix.h"
+#include "displays/ws2812/ws2812string.h"
 
 #define DELTA_E 0.5
 #define FACE_COLS 16 + 16 + 8 + 8 + 32 + 32
@@ -23,13 +25,22 @@
 #define FBSIZE FACE_COLS
 #define N_LAYERS 4
 
-WS2812Display display {
-  WS2812Matrix(16, 8, 0),
-  WS2812Matrix(32, 8, 0),
-  WS2812Matrix(8, 8, 0),
-  WS2812Matrix(16, 8, 0),
-  WS2812Matrix(32, 8, 0),
-  WS2812Matrix(8, 8, 0),
+// Define the layout of our physical display
+WS2812Display display{
+    WS2812String{16,
+        {
+            WS2812Matrix(16, 8, 0),
+            WS2812Matrix(32, 8, 0),
+            WS2812Matrix(8, 8, 0),
+        }
+    },
+    WS2812String{17,
+        {
+            WS2812Matrix(16, 8, 0),
+            WS2812Matrix(32, 8, 0),
+            WS2812Matrix(8, 8, 0),
+        }
+    }
 };
 
 // // Internal, hardware agnostic representation of the matrices
@@ -133,9 +144,19 @@ void setup()
 
   // matrixmanager.setFrame(framebuffer);
 
+  // Add the matrix strings from the display to fastled
+  for (auto tuple : display.getBuffers())
+  {
+    CRGB *buf = std::get<0>(tuple);
+    ssize_t buf_len = std::get<1>(tuple);
+    const uint8_t data_pin = std::get<2>(tuple);
+    LEDS.addLeds<WS2812, data_pin, GRB>(buf, buf_len);
+  }
+
+  LEDS.setBrightness(32);
+
   Serial.println("Setup complete");
 }
-
 
 // uint32_t last = 0;
 // uint32_t last_blink = 0;
@@ -147,6 +168,10 @@ void setup()
 
 void loop()
 {
+  display.fillScreen(fromRGB(255, 0, 0));
+  sleep(1000);
+  display.clear();
+  sleep(1000);
   // uint32_t now = millis();
 
   // // Handle overflow, update next loop
@@ -155,7 +180,7 @@ void loop()
   //   last = 0;
   //   return;
   // }
-  
+
   // // Time delta in milliseconds
   // uint32_t deltatime = now - last;
   // last = now;

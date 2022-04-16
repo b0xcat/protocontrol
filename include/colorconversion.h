@@ -37,4 +37,9 @@ return ((uint32_t)pgm_read_byte(&gamma5[ color >> 11       ]) << 16) |
                     pgm_read_byte(&gamma5[ color       & 0x1F]);
 }
 
+// Simple conversion to 565 from 8bit per channel rgb
+uint16_t fromRGB( uint8_t r, uint8_t g, uint8_t b) {
+  return ( ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3) );
+}
+
 #endif // _COLORCONVERSION_H_
