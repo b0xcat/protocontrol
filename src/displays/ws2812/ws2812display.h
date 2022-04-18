@@ -103,7 +103,7 @@ public:
 
     void clear() {
         for (auto &matrixString: matrix_strings) {
-            matrixString->fillScreen(0);
+            matrixString->clear();
         }
     }
 

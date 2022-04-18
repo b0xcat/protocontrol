@@ -109,9 +109,10 @@ public:
     }
 
     void clear() {
-        for (auto &matrix: matrices) {
-            matrix.fillScreen(0);
-        }
+        memset(pixels, 0, sizeof(CRGB) * num_pixels);
+        // for (auto &matrix: matrices) {
+        //     matrix.fillScreen(0);
+        // }
     }
 
     CRGB* getBuffer() {
