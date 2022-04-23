@@ -7,7 +7,7 @@
 #include "scene/visitors/elementvisitor.h"
 #include "bitmaps.h"
 
-class BitmapElement: public Element {
+class BitmapElement: public Element, public IPixelReadable {
 private:
     ProtoControl::IBitmap* bitmap;
 
@@ -19,8 +19,6 @@ public:
 
     BitmapElement(
         std::string name,
-        uint16_t width,
-        uint16_t height,
         uint32_t draw_x,
         uint32_t draw_y,
         std::initializer_list<Element*> children = {}
@@ -31,6 +29,8 @@ public:
     }
 
     uint16_t getPixel(int16_t x, int16_t y);
+    uint16_t getWidth();
+    uint16_t getHeight();
 
     void accept(ElementVisitor *visitor);
 };

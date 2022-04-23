@@ -22,4 +22,12 @@ public:
     virtual void accept(ElementVisitor *visitor) = 0;
 };
 
+// For modifier support
+class IPixelReadable {
+public:
+    virtual uint16_t getPixel(int16_t x, int16_t y) = 0;
+    virtual uint16_t getWidth() = 0;
+    virtual uint16_t getHeight() = 0;
+};
+
 #endif

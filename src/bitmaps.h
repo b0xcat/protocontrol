@@ -21,6 +21,8 @@ namespace ProtoControl {
 
 		virtual uint16_t getPixel(uint16_t x, uint16_t y) = 0;
 		virtual void setPixel(uint16_t x, uint16_t y, uint16_t color) = 0;
+		virtual uint16_t getWidth() = 0;
+		virtual uint16_t getHeight() = 0;
 		virtual void save() = 0;
 		virtual void load() = 0;
 		
@@ -50,6 +52,14 @@ namespace ProtoControl {
 
 		void setPixel(uint16_t x, uint16_t y, uint16_t color) override {
 			// Not modifiable >:( 
+		}
+
+		uint16_t getWidth() {
+			return w;
+		}
+
+		uint16_t getHeight() {
+			return h;
 		}
 
 		void save() {}
@@ -94,11 +104,19 @@ namespace ProtoControl {
 		}
 
 		uint16_t getPixel(uint16_t x, uint16_t y) override {
-			return buf[x * w + y];
+			return buf[x * h + y];
 		}
 
 		void setPixel(uint16_t x, uint16_t y, uint16_t color) override {
-			buf[x * w + y] = color;
+			buf[x * h + y] = color;
+		}
+
+		uint16_t getWidth() {
+			return w;
+		}
+
+		uint16_t getHeight() {
+			return h;
 		}
 
 		void save() override {

@@ -29,6 +29,8 @@
 #include "scene/visitors/elementprinter.h"
 #include "scene/visitors/elementrgbbitmapsetter.h"
 #include "scene/visitors/elementdrawer.h"
+#include "scene/modifiers/mirror.h"
+#include "scene/modifiers/rainbow.h"
 
 #include "bitmaps.h"
 
@@ -37,10 +39,6 @@
 #define FACE_ROWS 8
 #define FBSIZE FACE_COLS
 #define N_LAYERS 4
-
-// ProtoControl::FSBacked565Bitmap eye(LITTLEFS, "565/proto_eye");
-// ProtoControl::FSBacked565Bitmap mouth(LITTLEFS, "565/proto_mouth");
-// ProtoControl::FSBacked565Bitmap nose(LITTLEFS, "565/proto_nose");
 
 ProtoControl::BitmapManager<256> bitmapManager;
 
@@ -62,13 +60,22 @@ WS2812Display display {
 
 // Define the elements of our scene
 // in this case, these are all the parts of the face we want to draw
-Scene scene {       // name     w x h   x   y
-  new AdafruitGFXElement {"eye_r",   16, 8,  0,  0},
-  new AdafruitGFXElement {"mouth_r", 32, 8,  16, 0},
-  new AdafruitGFXElement {"nose_r",  8,  8,  48, 0},
-  new AdafruitGFXElement {"eye_l",   16, 8,  56, 0},
-  new AdafruitGFXElement {"mouth_l", 32, 8,  72, 0},
-  new AdafruitGFXElement {"nose_l",  8,  8,  104,0},
+// Scene scene {       // name     w x h   x   y
+//   new MirrorHorizontal<AdafruitGFXElement> {"eye_r",   16, 8,  0,  0},
+//   new MirrorHorizontal<AdafruitGFXElement> {"mouth_r", 32, 8,  16, 0},
+//   new MirrorHorizontal<AdafruitGFXElement> {"nose_r",  8,  8,  48, 0},
+//   new AdafruitGFXElement {"eye_l",   16, 8,  56, 0},
+//   new AdafruitGFXElement {"mouth_l", 32, 8,  72, 0},
+//   new AdafruitGFXElement {"nose_l",  8,  8,  104,0},
+// };
+
+Scene scene {
+  new MirrorHorizontal<BitmapElement> {"eye_r",   0,  0},
+  new MirrorHorizontal<BitmapElement> {"mouth_r", 16, 0},
+  new MirrorHorizontal<BitmapElement> {"nose_r",  48, 0},
+  new Rainbow<BitmapElement> {"eye_l",   56, 0},
+  new Rainbow<BitmapElement> {"mouth_l", 72, 0},
+  new Rainbow<BitmapElement> {"nose_l",  104,0},
 };
 
 // Used to draw to the display
@@ -96,16 +103,27 @@ void setup()
 
   ep.visit(&scene);
 
+  // bmpsetter
+  //   .add("eye_r", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_eye, 16, 8))
+  //   .add("eye_l", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_eye, 16, 8))
+  //   .add("nose_r", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_nose, 8, 8))
+  //   .add("nose_l", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_nose, 8, 8))
+  //   .add("mouth_r", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_mouth, 32, 8))
+  //   .add("mouth_l", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_mouth, 32, 8))
+  //   .visit(&scene);
+
   bmpsetter
-    .add("eye_r", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_eye, 16, 8))
-    .add("eye_l", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_eye, 16, 8))
-    .add("nose_r", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_nose, 8, 8))
-    .add("nose_l", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_nose, 8, 8))
-    .add("mouth_r", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_mouth, 32, 8))
-    .add("mouth_l", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_mouth, 32, 8))
+    .add("eye_r", bitmapManager.get("/565/proto_eye"))
+    .add("eye_l", bitmapManager.get("/565/proto_eye"))
+    .add("nose_r", bitmapManager.get("/565/proto_nose"))
+    .add("nose_l", bitmapManager.get("/565/proto_nose"))
+    .add("mouth_r", bitmapManager.get("/565/proto_mouth"))
+    .add("mouth_l", bitmapManager.get("/565/proto_mouth"))
     .visit(&scene);
 
   drawer.visit(&scene);
+
+  display.setBrightness(64);
 }
 
 
@@ -122,9 +140,9 @@ void loop()
   after = micros();
 
   delta = after - before;
-  // Serial.print("Updating took ");
-  // Serial.print(delta);
-  // Serial.println(" us");
+  Serial.print("Updating took ");
+  Serial.print(delta);
+  Serial.println(" us");
 
   // Clear
   before = micros();
@@ -132,9 +150,9 @@ void loop()
   after = micros();
 
   delta = after - before;
-  // Serial.print("Clearing took ");
-  // Serial.print(delta);
-  // Serial.println(" us");
+  Serial.print("Clearing took ");
+  Serial.print(delta);
+  Serial.println(" us");
 
   // Draw
   before = micros();
@@ -142,9 +160,9 @@ void loop()
   after = micros();
 
   delta = after - before;
-  // Serial.print("Drawing took ");
-  // Serial.print(delta);
-  // Serial.println(" us");
+  Serial.print("Drawing took ");
+  Serial.print(delta);
+  Serial.println(" us");
 
   display.show();
 }

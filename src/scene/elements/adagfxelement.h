@@ -7,7 +7,7 @@
 #include "scene/visitors/elementvisitor.h"
 
 
-class AdafruitGFXElement: public Element, public Adafruit_GFX {
+class AdafruitGFXElement: public Element, public Adafruit_GFX, public IPixelReadable {
 private:
     uint16_t* framebuffer;
     ssize_t framebuffer_size;
@@ -30,7 +30,9 @@ public:
     void drawPixel(int16_t x, int16_t y, uint16_t color);
 
     uint16_t getPixel(int16_t x, int16_t y);
-
+    uint16_t getWidth();
+    uint16_t getHeight();
+    
     void accept(ElementVisitor *visitor);
 
     ~AdafruitGFXElement() {

@@ -3,7 +3,7 @@ from PIL import Image
 
 
 def RGBto565(r, g, b):
-    return bytes.fromhex("%0.4X" % ((int(r / 255 * 31) << 11) | (int(g / 255 * 63) << 5) | (int(b / 255 * 31))))
+    return bytes.fromhex("%0.4X" % ((int(b / 255 * 31) << 11) | (int(r / 255 * 63) << 5) | (int(g / 255 * 31))))
 
 
 if __name__ == "__main__":
@@ -35,8 +35,8 @@ if __name__ == "__main__":
         out_bytes += image.height.to_bytes(2, "little")
 
         # IMAGE DATA
-        for y in range(image.height):
-            for x in range(image.width):
+        for x in range(image.width):
+            for y in range(image.height):
                 r, g, b, *_ = image.getpixel((x, y))
                 out_bytes += RGBto565(r, g, b)
 

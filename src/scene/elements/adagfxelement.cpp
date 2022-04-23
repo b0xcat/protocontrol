@@ -26,6 +26,14 @@ uint16_t AdafruitGFXElement::getPixel(int16_t x, int16_t y) {
     return framebuffer[x * HEIGHT + y];
 }
 
+uint16_t AdafruitGFXElement::getWidth() {
+    return width();
+}
+
+uint16_t AdafruitGFXElement::getHeight() {
+    return height();
+}
+
 void AdafruitGFXElement::accept(ElementVisitor *visitor) {
         visitor->visit(this);
     }
