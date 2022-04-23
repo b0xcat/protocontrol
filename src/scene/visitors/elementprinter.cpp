@@ -3,6 +3,7 @@
 
 #include "scene/elements/element.h"
 #include "scene/elements/bitmapelement.h"
+#include "scene/elements/adagfxelement.h"
 #include "scene/scene.h"
 
 
@@ -23,7 +24,7 @@ void ElementPrinter::visit(Scene* el) {
     follow_children(el);
 }
 
-void ElementPrinter::visit(BitmapElement* el) {
+void ElementPrinter::visit(AdafruitGFXElement* el) {
     print_spacer();
 
     out.print(el->getName().c_str());
@@ -32,6 +33,19 @@ void ElementPrinter::visit(BitmapElement* el) {
     out.print(", ");
     out.print(el->height());
     out.println("]");
+    
+    follow_children(el);
+};
+
+void ElementPrinter::visit(BitmapElement* el) {
+    print_spacer();
+
+    out.print(el->getName().c_str());
+    // out.print("[");
+    // out.print(el->width());
+    // out.print(", ");
+    // out.print(el->height());
+    // out.println("]");
     
     follow_children(el);
 };

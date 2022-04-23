@@ -31,14 +31,14 @@ static const uint8_t PROGMEM
 
 // Expand 16-bit input color (Adafruit_GFX colorspace) to 24-bit (NeoPixel)
 // (w/gamma adjustment)
-inline uint32_t expandColor(uint16_t color) {
+inline constexpr uint32_t expandColor(uint16_t color) {
 return ((uint32_t)pgm_read_byte(&gamma5[ color >> 11       ]) << 16) |
         ((uint32_t)pgm_read_byte(&gamma6[(color >> 5) & 0x3F]) <<  8) |
                     pgm_read_byte(&gamma5[ color       & 0x1F]);
 }
 
 // Simple conversion to 565 from 8bit per channel rgb
-uint16_t fromRGB( uint8_t r, uint8_t g, uint8_t b) {
+inline constexpr uint16_t fromRGB( uint8_t r, uint8_t g, uint8_t b) {
   return ( ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3) );
 }
 

@@ -92,9 +92,9 @@ public:
         }
         // FastLED.show();
         unsigned long after = micros();
-        Serial.print("FASTLED TOOK: ");
-        Serial.print(after - before);
-        Serial.println(" us");
+        // Serial.print("FASTLED TOOK: ");
+        // Serial.print(after - before);
+        // Serial.println(" us");
     }
 
     void setBrightness(uint8_t scale) {

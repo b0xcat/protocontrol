@@ -33,9 +33,9 @@ public:
         }
 
         // TODO: COLOR SUPPORT
-        if (color != 0) {
-            color = 0xF800;
-        }
+        // if (color != 0) {
+        //     color = 0xF800;
+        // }
 
         // What "physical" matrix are we in?
         uint n_mats = WIDTH / MAT_W;

@@ -4,7 +4,7 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <FS.h>
-#include <SPIFFS.h>
+#include <LITTLEFS.h>
 #include <stdint.h>
 
 //#define FASTLED_ESP32_I2S
@@ -25,6 +25,7 @@
 
 #include "scene/scene.h"
 #include "scene/elements/bitmapelement.h"
+#include "scene/elements/adagfxelement.h"
 #include "scene/visitors/elementprinter.h"
 #include "scene/visitors/elementrgbbitmapsetter.h"
 #include "scene/visitors/elementdrawer.h"
@@ -36,6 +37,12 @@
 #define FACE_ROWS 8
 #define FBSIZE FACE_COLS
 #define N_LAYERS 4
+
+// ProtoControl::FSBacked565Bitmap eye(LITTLEFS, "565/proto_eye");
+// ProtoControl::FSBacked565Bitmap mouth(LITTLEFS, "565/proto_mouth");
+// ProtoControl::FSBacked565Bitmap nose(LITTLEFS, "565/proto_nose");
+
+ProtoControl::BitmapManager<256> bitmapManager;
 
 // Define the layout of our physical display
 // The Strings need to be pointers to prevent slicing,
@@ -56,12 +63,12 @@ WS2812Display display {
 // Define the elements of our scene
 // in this case, these are all the parts of the face we want to draw
 Scene scene {       // name     w x h   x   y
-  new BitmapElement {"eye_r",   16, 8,  0,  0},
-  new BitmapElement {"mouth_r", 32, 8,  16, 0},
-  new BitmapElement {"nose_r",  8,  8,  48, 0},
-  new BitmapElement {"eye_l",   16, 8,  56, 0},
-  new BitmapElement {"mouth_l", 32, 8,  72, 0},
-  new BitmapElement {"nose_l",  8,  8,  104,0},
+  new AdafruitGFXElement {"eye_r",   16, 8,  0,  0},
+  new AdafruitGFXElement {"mouth_r", 32, 8,  16, 0},
+  new AdafruitGFXElement {"nose_r",  8,  8,  48, 0},
+  new AdafruitGFXElement {"eye_l",   16, 8,  56, 0},
+  new AdafruitGFXElement {"mouth_l", 32, 8,  72, 0},
+  new AdafruitGFXElement {"nose_l",  8,  8,  104,0},
 };
 
 // Used to draw to the display
@@ -78,19 +85,29 @@ void setup()
   esp_log_level_set("*", ESP_LOG_VERBOSE);
   Serial.begin(115200);
 
+  // Set up littleFS
+  if(!LITTLEFS.begin(true)){
+      Serial.println("LittleFS Mount Failed");
+      while(true) {}
+  }
+
+  // Collect and load the bitmaps in the LITTLEFS /565 folder
+  bitmapManager.gather(LITTLEFS, "/565");
+
   ep.visit(&scene);
 
   bmpsetter
-    .add("eye_r", (uint16_t*)epd_bitmap_eye)
-    .add("eye_l", (uint16_t*)epd_bitmap_eye)
-    .add("nose_r", (uint16_t*)epd_bitmap_nose)
-    .add("nose_l", (uint16_t*)epd_bitmap_nose)
-    .add("mouth_r", (uint16_t*)epd_bitmap_mouth)
-    .add("mouth_l", (uint16_t*)epd_bitmap_mouth)
+    .add("eye_r", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_eye, 16, 8))
+    .add("eye_l", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_eye, 16, 8))
+    .add("nose_r", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_nose, 8, 8))
+    .add("nose_l", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_nose, 8, 8))
+    .add("mouth_r", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_mouth, 32, 8))
+    .add("mouth_l", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_mouth, 32, 8))
     .visit(&scene);
 
   drawer.visit(&scene);
 }
+
 
 void loop()
 {
@@ -101,19 +118,13 @@ void loop()
   // Update
   before = micros();
   bmpsetter
-    .add("eye_r", (uint16_t*)epd_bitmap_eye)
-    .add("eye_l", (uint16_t*)epd_bitmap_eye)
-    .add("nose_r", (uint16_t*)epd_bitmap_nose)
-    .add("nose_l", (uint16_t*)epd_bitmap_nose)
-    .add("mouth_r", (uint16_t*)epd_bitmap_mouth)
-    .add("mouth_l", (uint16_t*)epd_bitmap_mouth)
     .visit(&scene);
   after = micros();
 
   delta = after - before;
-  Serial.print("Updating took ");
-  Serial.print(delta);
-  Serial.println(" us");
+  // Serial.print("Updating took ");
+  // Serial.print(delta);
+  // Serial.println(" us");
 
   // Clear
   before = micros();
@@ -121,9 +132,9 @@ void loop()
   after = micros();
 
   delta = after - before;
-  Serial.print("Clearing took ");
-  Serial.print(delta);
-  Serial.println(" us");
+  // Serial.print("Clearing took ");
+  // Serial.print(delta);
+  // Serial.println(" us");
 
   // Draw
   before = micros();
@@ -131,9 +142,9 @@ void loop()
   after = micros();
 
   delta = after - before;
-  Serial.print("Drawing took ");
-  Serial.print(delta);
-  Serial.println(" us");
+  // Serial.print("Drawing took ");
+  // Serial.print(delta);
+  // Serial.println(" us");
 
   display.show();
 }

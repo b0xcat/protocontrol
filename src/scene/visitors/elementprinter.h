@@ -22,6 +22,7 @@ public:
     ElementPrinter(Print &printer): out(printer) {}
 
     void visit(Scene* el);
+    void visit(AdafruitGFXElement* el);
     void visit(BitmapElement* el);
 };
 
