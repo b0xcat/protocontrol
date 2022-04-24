@@ -2,6 +2,7 @@
 #define _COLORCONVERSION_H_
 
 #include <stdint.h>
+#include <FastLED.h>
 
 #ifdef __AVR
  #include <avr/pgmspace.h>
@@ -41,6 +42,17 @@ return ((uint32_t)pgm_read_byte(&gamma5[ color >> 11       ]) << 16) |
 inline constexpr uint16_t fromRGB( uint8_t r, uint8_t g, uint8_t b) {
   return ( ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3) );
 }
+
+inline uint16_t convertCRGBto565(CRGB& in) {
+  return fromRGB(in.r, in.g, in.b);
+}
+
+inline void convert565toCRGB(uint16_t in, CRGB& out) {
+  out.r = ((((in >> 11) & 0x1F) * 527) + 23) >> 6;
+  out.g = ((((in >> 5) & 0x3F) * 259) + 33) >> 6;
+  out.b = (((in & 0x1F) * 527) + 23) >> 6;
+}
+
 
 
 // void RGBtoHSV (byte rgb[], double hsv[]) {

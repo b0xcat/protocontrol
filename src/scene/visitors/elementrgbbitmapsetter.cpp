@@ -4,6 +4,7 @@
 #include "scene/elements/element.h"
 #include "scene/elements/bitmapelement.h"
 #include "scene/elements/adagfxelement.h"
+#include "scene/elements/targetfollowerelement.h"
 #include "scene/scene.h"
 #include "bitmaps.h"
 
@@ -40,5 +41,9 @@ void ElementRGBBitmapSetter::visit(BitmapElement* el) {
         el->setBitmap(cur_bitmap);
     }
 
+    follow_children(el);
+}
+
+void ElementRGBBitmapSetter::visit(TargetFollowerElement* el) {
     follow_children(el);
 }

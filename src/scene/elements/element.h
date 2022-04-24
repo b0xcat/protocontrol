@@ -13,7 +13,16 @@ protected:
     std::vector<Element*> _children;
 
 public:
-    Element(std::string name, std::initializer_list<Element*> children);
+    Element(std::string name, std::initializer_list<Element*> children)
+    : Element(name, children.begin(), children.end()) 
+    {}
+
+    template <class It>
+    Element(std::string name, It first, It last)
+    : name(name)
+    {
+        _children.insert(_children.end(), first, last);
+    }
 
     std::vector<Element*> getChildren();
 

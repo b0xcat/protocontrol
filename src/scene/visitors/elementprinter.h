@@ -24,6 +24,7 @@ public:
     void visit(Scene* el);
     void visit(AdafruitGFXElement* el);
     void visit(BitmapElement* el);
+    void visit(TargetFollowerElement* el);
 };
 
 #endif

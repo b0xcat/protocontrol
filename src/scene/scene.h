@@ -8,6 +8,7 @@
 class Scene : public Element {
 public:
     Scene(std::initializer_list<Element*> children);
+    Scene(std::vector<Element*> children);
 
     void accept(ElementVisitor *visitor) override;
 };

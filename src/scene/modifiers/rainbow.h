@@ -10,7 +10,7 @@
 template <typename T> 
 class Rainbow: public T{
 private:
-    uint32_t count;
+    static uint32_t count;
 
 public:
     template <typename... Params>
@@ -18,8 +18,19 @@ public:
     : T (std::forward<Params>(args)...)
     {}
 
+    Rainbow(
+        std::string name,
+        uint32_t width,
+        uint32_t height,
+        uint32_t draw_x,
+        uint32_t draw_y,
+        std::initializer_list<Element*> children = {}
+    )
+    : T (name, width, height, draw_x, draw_y, children)
+    {}
+
     uint16_t getPixel(int16_t x, int16_t y) {
-        CHSV in(count / 33 + x * y, 255, 255);
+        CHSV in(count / 100 + x * y, 255, 255);
         CRGB out;
 
         uint16_t cur_color = T::getPixel(x, y);
@@ -35,5 +46,8 @@ public:
         return fromRGB(out.r, out.g, out.b);
     }
 };
+
+template <typename T>
+uint32_t Rainbow<T>::count = 0;
 
 #endif

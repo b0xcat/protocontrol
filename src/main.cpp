@@ -26,20 +26,17 @@
 #include "scene/scene.h"
 #include "scene/elements/bitmapelement.h"
 #include "scene/elements/adagfxelement.h"
+#include "scene/elements/targetfollowerelement.h"
 #include "scene/visitors/elementprinter.h"
 #include "scene/visitors/elementrgbbitmapsetter.h"
 #include "scene/visitors/elementdrawer.h"
+#include "scene/visitors/elementupdater.h"
 #include "scene/modifiers/mirror.h"
 #include "scene/modifiers/rainbow.h"
 
 #include "bitmaps.h"
 
-#define DELTA_E 0.5
-#define FACE_COLS 16 + 16 + 8 + 8 + 32 + 32
-#define FACE_ROWS 8
-#define FBSIZE FACE_COLS
-#define N_LAYERS 4
-
+#define NUM_LEDS_SIDEPANEL 15 + 8 + 16 + 12
 ProtoControl::BitmapManager<256> bitmapManager;
 
 // Define the layout of our physical display
@@ -55,27 +52,36 @@ WS2812Display display {
             WS2812Matrix(16, 8, 2),
             WS2812Matrix(32, 8, 2),
             WS2812Matrix(8, 8, 2),
+    },
+    new WS2812StringPin<21> {
+            WS2812Matrix(8, 8, 0),
+    },
+    new WS2812StringPin<22> {
+            WS2812Matrix(8, 8, 0),
     }
 };
 
-// Define the elements of our scene
-// in this case, these are all the parts of the face we want to draw
-// Scene scene {       // name     w x h   x   y
-//   new MirrorHorizontal<AdafruitGFXElement> {"eye_r",   16, 8,  0,  0},
-//   new MirrorHorizontal<AdafruitGFXElement> {"mouth_r", 32, 8,  16, 0},
-//   new MirrorHorizontal<AdafruitGFXElement> {"nose_r",  8,  8,  48, 0},
-//   new AdafruitGFXElement {"eye_l",   16, 8,  56, 0},
-//   new AdafruitGFXElement {"mouth_l", 32, 8,  72, 0},
-//   new AdafruitGFXElement {"nose_l",  8,  8,  104,0},
-// };
-
 Scene scene {
-  new MirrorHorizontal<BitmapElement> {"eye_r",   0,  0},
-  new MirrorHorizontal<BitmapElement> {"mouth_r", 16, 0},
-  new MirrorHorizontal<BitmapElement> {"nose_r",  48, 0},
-  new Rainbow<BitmapElement> {"eye_l",   56, 0},
-  new Rainbow<BitmapElement> {"mouth_l", 72, 0},
-  new Rainbow<BitmapElement> {"nose_l",  104,0},
+  new Rainbow<TargetFollowerElement> {"eye_r_follower", 16, 8, 0, 0, {
+    new MirrorHorizontal<BitmapElement> {"eye_r",   0,  0},
+  }},
+  new Rainbow<TargetFollowerElement> {"mouth_r_follower", 32, 8, 16, 0, {
+    new MirrorHorizontal<BitmapElement> {"mouth_r", 0, 0},
+  }},
+  new Rainbow<TargetFollowerElement> {"nose_r_follower", 8, 8, 48, 0, {
+    new MirrorHorizontal<BitmapElement> {"nose_r",  0, 0},
+  }},
+  new Rainbow<TargetFollowerElement> {"eye_l_follower", 16, 8, 56, 0, {
+    new BitmapElement {"eye_l",   0, 0},
+  }},
+  new Rainbow<TargetFollowerElement> {"mouth_l_follower", 32, 8, 72, 0, {
+    new BitmapElement {"mouth_l", 0, 0},
+  }},
+  new Rainbow<TargetFollowerElement> {"nose_l_follower", 8, 8, 104, 0, {
+    new BitmapElement {"nose_l",  0, 0},
+  }},
+  new Rainbow<BitmapElement> {"ear_l", 112, 0},
+  new Rainbow<BitmapElement> {"ear_r", 120, 0},
 };
 
 // Used to draw to the display
@@ -83,9 +89,13 @@ ElementDrawer drawer(display);
 
 // Used to set bitmaps in the scene
 ElementRGBBitmapSetter bmpsetter;
+ElementRGBBitmapSetter eyesclosedsetter;
 
 // Used to print a text representation of the scene
 ElementPrinter ep(Serial);
+
+// Used to update the elements in the scene
+ElementUpdater updater;
 
 void setup()
 {
@@ -103,15 +113,6 @@ void setup()
 
   ep.visit(&scene);
 
-  // bmpsetter
-  //   .add("eye_r", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_eye, 16, 8))
-  //   .add("eye_l", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_eye, 16, 8))
-  //   .add("nose_r", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_nose, 8, 8))
-  //   .add("nose_l", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_nose, 8, 8))
-  //   .add("mouth_r", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_mouth, 32, 8))
-  //   .add("mouth_l", new ProtoControl::Static565Bitmap((uint16_t*)epd_bitmap_mouth, 32, 8))
-  //   .visit(&scene);
-
   bmpsetter
     .add("eye_r", bitmapManager.get("/565/proto_eye"))
     .add("eye_l", bitmapManager.get("/565/proto_eye"))
@@ -119,24 +120,44 @@ void setup()
     .add("nose_l", bitmapManager.get("/565/proto_nose"))
     .add("mouth_r", bitmapManager.get("/565/proto_mouth"))
     .add("mouth_l", bitmapManager.get("/565/proto_mouth"))
+    .add("ear_l", bitmapManager.get("/565/proto_ear"))
+    .add("ear_r", bitmapManager.get("/565/proto_ear"))
     .visit(&scene);
+
+  eyesclosedsetter
+    .add("eye_r", bitmapManager.get("/565/proto_eye_closed"))
+    .add("eye_l", bitmapManager.get("/565/proto_eye_closed"));
 
   drawer.visit(&scene);
 
-  display.setBrightness(64);
+  display.setBrightness(255);
 }
 
-
+unsigned long prev = 0;
 void loop()
 {
+  // For updating
+  unsigned long now = micros();
+  unsigned long updateDelta = now - prev;
+  unsigned long prev = now;
+
+  // For benchmarking
   unsigned long before;
   unsigned long after;
   unsigned long delta;
 
   // Update
   before = micros();
-  bmpsetter
-    .visit(&scene);
+
+  updater.setTimeDelta(micros());
+  updater.visit(&scene);
+
+  if (now / 200000 % 2) {
+    eyesclosedsetter.visit(&scene);
+  } else {
+    bmpsetter.visit(&scene);
+  }
+
   after = micros();
 
   delta = after - before;
