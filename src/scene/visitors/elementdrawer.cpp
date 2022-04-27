@@ -23,7 +23,7 @@ void ElementDrawer::visit(AdafruitGFXElement* el) {
 
     for (uint y = 0; y < el->height(); y++) {
         for (uint x = 0; x < el->width(); x++ ) {
-            display.drawPixel(draw_x + x, draw_y + y, el->getPixel(x, y));
+            display.setPixel(draw_x + x, draw_y + y, el->getPixel(x, y));
         }
     }
     
@@ -36,7 +36,7 @@ void ElementDrawer::visit(BitmapElement* el) {
 
     for (uint y = 0; y < el->getHeight(); y++) {
         for (uint x = 0; x < el->getWidth(); x++ ) {
-            display.drawPixel(draw_x + x, draw_y + y, el->getPixel(x, y));
+            display.setPixel(draw_x + x, draw_y + y, el->getPixel(x, y));
         }
     }
 
@@ -49,7 +49,7 @@ void ElementDrawer::visit(TargetFollowerElement* el) {
 
     for (uint y = 0; y < el->getHeight(); y++) {
         for (uint x = 0; x < el->getWidth(); x++ ) {
-            display.drawPixel(draw_x + x, draw_y + y, el->getPixel(x, y));
+            display.setPixel(draw_x + x, draw_y + y, el->getPixel(x, y));
         }
     }
 }

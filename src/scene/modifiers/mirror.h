@@ -13,7 +13,7 @@ public:
     : T (std::forward<Params>(args)...)
     {}
 
-    uint16_t getPixel(int16_t x, int16_t y) {
+    CRGB getPixel(uint16_t x, uint16_t y) const override {
         return T::getPixel(T::getWidth() - 1 - x, y);
     }
 };

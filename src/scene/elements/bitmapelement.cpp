@@ -11,15 +11,15 @@ BitmapElement::BitmapElement(
     , draw_y(draw_y)
     {}
 
-uint16_t BitmapElement::getPixel(int16_t x, int16_t y) {
+CRGB BitmapElement::getPixel(uint16_t x, uint16_t y) const {
     return bitmap->getPixel(x, y);
 }
 
-uint16_t BitmapElement::getWidth() {
+uint16_t BitmapElement::getWidth() const {
     return bitmap->getWidth();
 }
 
-uint16_t BitmapElement::getHeight() {
+uint16_t BitmapElement::getHeight() const {
     return bitmap->getHeight();
 }
 

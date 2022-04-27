@@ -3,6 +3,7 @@
 
 #include <initializer_list>
 #include <Adafruit_GFX.h>
+#include <FastLED.h>
 #include "scene/elements/element.h"
 #include "scene/visitors/elementvisitor.h"
 #include "bitmaps.h"
@@ -28,9 +29,9 @@ public:
         this->bitmap = bitmap;
     }
 
-    uint16_t getPixel(int16_t x, int16_t y);
-    uint16_t getWidth();
-    uint16_t getHeight();
+    CRGB getPixel(uint16_t x, uint16_t y) const;
+    uint16_t getWidth() const;
+    uint16_t getHeight() const;
 
     void accept(ElementVisitor *visitor);
 };

@@ -35,6 +35,7 @@ public:
         for (auto &string : strings) {
             _strings.push_back(std::unique_ptr<FastLEDString>(string));
         }
+
     }
 
     void show() {
@@ -45,16 +46,24 @@ public:
         }
         // FastLED.show();
         unsigned long after = micros();
-        // Serial.print("FASTLED TOOK: ");
-        // Serial.print(after - before);
-        // Serial.println(" us");
+        Serial.print("FASTLED TOOK: ");
+        Serial.print(after - before);
+        Serial.println(" us");
     }
 
     void setBrightness(uint16_t display_idx, uint8_t scale) {
         _strings.at(display_idx)->setBrightness(scale);
     }
 
+    void setBrightness(uint8_t scale) {
+        for (auto& string: _strings) {
+            string->setBrightness(scale);
+        }
+    }
+
     void setPixel(uint16_t x, uint16_t y, CRGB color) {
+        uint stringn = 0;
+        uint matn = 0;
         for (auto& string: _strings) {
             for (auto& matrix: string->getMatrices()) {
                 auto matrix_x = matrix->getX();
@@ -68,9 +77,12 @@ public:
                     && x < matrix_x + matrix_w 
                     && y < matrix_y + matrix_h
                 ) {
-                    matrix->setPixel(x, y, color);
+                    Serial.printf("Setting pixel in str %d, mat %d (%d, %d) -> (%d, %d, %d) \n", stringn, matn, x, y, color.r, color.g, color.b);
+                    matrix->setPixel(x - matrix_x, y - matrix_y, color);
                 }
+                matn++;
             }
+            stringn++;
         }
     }
 
@@ -82,6 +94,14 @@ public:
     void clear() {
         for (auto &matrixString: _strings) {
             matrixString->clear();
+        }
+    }
+
+    void fill(CRGB color) {
+        for (auto &matrixString: _strings) {
+            for (uint32_t n = 0; n < matrixString->num_pixels; n++) {
+                matrixString->pixels[n] = color;
+            }
         }
     }
 

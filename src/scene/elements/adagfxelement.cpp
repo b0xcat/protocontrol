@@ -22,15 +22,15 @@ void AdafruitGFXElement::drawPixel(int16_t x, int16_t y, uint16_t color) {
     framebuffer[x * HEIGHT + y] = color;
 }
 
-uint16_t AdafruitGFXElement::getPixel(int16_t x, int16_t y) {
+CRGB AdafruitGFXElement::getPixel(uint16_t x, uint16_t y) const {
     return framebuffer[x * HEIGHT + y];
 }
 
-uint16_t AdafruitGFXElement::getWidth() {
+uint16_t AdafruitGFXElement::getWidth() const {
     return width();
 }
 
-uint16_t AdafruitGFXElement::getHeight() {
+uint16_t AdafruitGFXElement::getHeight() const {
     return height();
 }
 

@@ -2,15 +2,17 @@
 #define __ELEMENT_DRAWER_H__
 
 #include "scene/visitors/elementvisitor.h"
-#include <Adafruit_GFX.h>
+// #include <Adafruit_GFX.h>
+#include "ipixel.h"
 
 class ElementDrawer: ElementVisitor {
 private:
     void follow_children(Element* el);
-    Adafruit_GFX& display;
+    // Adafruit_GFX& display;
+    IPixelReadWriteable& display;
 
 public:
-    ElementDrawer(Adafruit_GFX &display)
+    ElementDrawer(IPixelReadWriteable &display)
     : display(display)
     {}
 

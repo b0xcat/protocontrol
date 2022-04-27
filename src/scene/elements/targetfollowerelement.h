@@ -407,8 +407,10 @@ public:
     //     } 
     // }
 
-    uint16_t getPixel(int16_t x, int16_t y) {
-        return current_framebuffer->getPixel(x, y);
+    CRGB getPixel(int16_t x, int16_t y) const {
+        CRGB tmp;
+        convert565toCRGB(current_framebuffer->getPixel(x, y), tmp);
+        return tmp;
         //TODO: wtf
         //return target_framebuffer->getPixel(x, y);
         // First check if it is masked or not
@@ -424,8 +426,8 @@ public:
         // }
     }
 
-    uint16_t getWidth() {return width;}
-    uint16_t getHeight() {return height;}
+    uint16_t getWidth() const {return width;}
+    uint16_t getHeight() const {return height;}
 
     void accept(ElementVisitor *visitor) {
         visitor->visit(this);

@@ -50,6 +50,8 @@ public:
                                 });
         pixels = std::unique_ptr<CRGB[]>(new CRGB[num_pixels]);
 
+        FastLED.addLeds(controller, pixels.get(), num_pixels);
+
         // Let the matrices know about their memory
         uint32_t cur_pixel = 0;
         for (auto& matrix : matrices) {

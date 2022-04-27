@@ -29,7 +29,7 @@ public:
     : T (name, width, height, draw_x, draw_y, children)
     {}
 
-    uint16_t getPixel(int16_t x, int16_t y) {
+    CRGB getPixel(uint16_t x, uint16_t y) const override {
         CHSV in(count / 100 + x * y, 255, 255);
         CRGB out;
 
@@ -43,7 +43,7 @@ public:
 
         hsv2rgb_rainbow(in, out);
 
-        return fromRGB(out.r, out.g, out.b);
+        return out;
     }
 };
 

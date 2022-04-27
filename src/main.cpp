@@ -23,16 +23,18 @@
 // #include "displays/ws2812/ws2812matrix.h"
 // #include "displays/ws2812/ws2812string.h"
 
-// #include "scene/scene.h"
-// #include "scene/elements/bitmapelement.h"
+#include "scene/scene.h"
+#include "scene/elements/bitmapelement.h"
 // #include "scene/elements/adagfxelement.h"
 // #include "scene/elements/targetfollowerelement.h"
+
 // #include "scene/visitors/elementprinter.h"
-// #include "scene/visitors/elementrgbbitmapsetter.h"
-// #include "scene/visitors/elementdrawer.h"
+#include "scene/visitors/elementrgbbitmapsetter.h"
+#include "scene/visitors/elementdrawer.h"
 // #include "scene/visitors/elementupdater.h"
-// #include "scene/modifiers/mirror.h"
-// #include "scene/modifiers/rainbow.h"
+
+#include "scene/modifiers/mirror.h"
+#include "scene/modifiers/rainbow.h"
 
 #include "bitmaps.h"
 #include "displays/fastled/fastleddisplay.h"
@@ -42,14 +44,14 @@
 // Define the layout of our physical display
 FastLEDDisplay display {
   new FastLEDString { 
-    new WS2812<16, BGR>, {
+    new WS2812<16, GRB>, {
       new FastLEDMatrix {16, 8,  0,  0,  0},
       new FastLEDMatrix {32, 8,  0, 16,  0},
       new FastLEDMatrix {8,  8,  32, 8,  0},
     }
   }, 
   new FastLEDString { 
-    new WS2812<17, BGR>, {
+    new WS2812<17, GRB>, {
       new FastLEDMatrix {16, 8,  64,  0,  2},
       new FastLEDMatrix {32, 8,  48, 16,  2},
       new FastLEDMatrix {8,  8,  40,  8,  2},
@@ -61,6 +63,14 @@ FastLEDDisplay display {
 
 ProtoControl::BitmapManager<256> bitmapManager;
 
+Scene scene {
+  new Rainbow<MirrorHorizontal<BitmapElement>> {"eye_l",     0,  0},
+  new Rainbow<MirrorHorizontal<BitmapElement>> {"nose_l",   32,  8},
+  new Rainbow<MirrorHorizontal<BitmapElement>> {"mouth_l",   0, 16},
+  new Rainbow<BitmapElement>                   {"eye_r",    64,  0},
+  new Rainbow<BitmapElement>                   {"nose_r",   40,  8},
+  new Rainbow<BitmapElement>                   {"mouth_r",  48, 16},
+};
 
 // Scene scene {
 //   new Rainbow<TargetFollowerElement> {"eye_r_follower", 16, 8, 0, 0, {
@@ -86,10 +96,10 @@ ProtoControl::BitmapManager<256> bitmapManager;
 // };
 
 // // Used to draw to the display
-// ElementDrawer drawer(display);
+ElementDrawer drawer(display);
 
 // // Used to set bitmaps in the scene
-// ElementRGBBitmapSetter bmpsetter;
+ElementRGBBitmapSetter bmpsetter;
 // ElementRGBBitmapSetter eyesclosedsetter;
 
 // // Used to print a text representation of the scene
@@ -114,24 +124,47 @@ void setup()
 
   // ep.visit(&scene);
 
-  // bmpsetter
-  //   .add("eye_r", bitmapManager.get("/565/proto_eye"))
-  //   .add("eye_l", bitmapManager.get("/565/proto_eye"))
-  //   .add("nose_r", bitmapManager.get("/565/proto_nose"))
-  //   .add("nose_l", bitmapManager.get("/565/proto_nose"))
-  //   .add("mouth_r", bitmapManager.get("/565/proto_mouth"))
-  //   .add("mouth_l", bitmapManager.get("/565/proto_mouth"))
-  //   .add("ear_l", bitmapManager.get("/565/proto_ear"))
-  //   .add("ear_r", bitmapManager.get("/565/proto_ear"))
-  //   .visit(&scene);
+  bmpsetter
+    .add("eye_r", bitmapManager.get("/565/proto_eye"))
+    .add("eye_l", bitmapManager.get("/565/proto_eye"))
+    .add("nose_r", bitmapManager.get("/565/proto_nose"))
+    .add("nose_l", bitmapManager.get("/565/proto_nose"))
+    .add("mouth_r", bitmapManager.get("/565/proto_mouth"))
+    .add("mouth_l", bitmapManager.get("/565/proto_mouth"))
+    .add("ear_l", bitmapManager.get("/565/proto_ear"))
+    .add("ear_r", bitmapManager.get("/565/proto_ear"))
+    .visit(&scene);
 
   // eyesclosedsetter
   //   .add("eye_r", bitmapManager.get("/565/proto_eye_closed"))
   //   .add("eye_l", bitmapManager.get("/565/proto_eye_closed"));
 
-  // drawer.visit(&scene);
+  display.setBrightness(32);
 
-  // display.setBrightness(32);
+  display.fill({32, 32, 32});
+  display.show();
+  delay(200);
+  display.clear();
+  display.show();
+  delay(200);
+  display.fill({32, 32, 32});
+  display.show();
+  delay(200);
+  display.clear();
+  display.show();
+  delay(200);
+  display.fill({32, 32, 32});
+  display.show();
+  delay(200);
+  display.clear();
+  display.show();
+  delay(200);
+
+
+  display.clear();
+  drawer.visit(&scene);
+  display.show();
+  
 }
 
 unsigned long prev = 0;
