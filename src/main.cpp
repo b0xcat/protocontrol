@@ -95,31 +95,18 @@ Scene scene{
     
 };
 
-// Scene scene {
-//   new Rainbow<TargetFollowerElement> {"eye_r_follower", 16, 8, 0, 0, {
-//     new MirrorHorizontal<BitmapElement> {"eye_r",   0,  0},
-//   }},
-//   new Rainbow<TargetFollowerElement> {"mouth_r_follower", 32, 8, 16, 0, {
-//     new MirrorHorizontal<BitmapElement> {"mouth_r", 0, 0},
-//   }},
-//   new Rainbow<TargetFollowerElement> {"nose_r_follower", 8, 8, 48, 0, {
-//     new MirrorHorizontal<BitmapElement> {"nose_r",  0, 0},
-//   }},
-//   new Rainbow<TargetFollowerElement> {"eye_l_follower", 16, 8, 56, 0, {
-//     new BitmapElement {"eye_l",   0, 0},
-//   }},
-//   new Rainbow<TargetFollowerElement> {"mouth_l_follower", 32, 8, 72, 0, {
-//     new BitmapElement {"mouth_l", 0, 0},
-//   }},
-//   new Rainbow<TargetFollowerElement> {"nose_l_follower", 8, 8, 104, 0, {
-//     new BitmapElement {"nose_l",  0, 0},
-//   }},
-//   new Rainbow<BitmapElement> {"ear_l", 112, 0},
-//   new Rainbow<BitmapElement> {"ear_r", 120, 0},
-// };
+
+volatile bool flipped = false;
+CRGBCanvas framebuffer[] {
+    CRGBCanvas(80, 24),
+    CRGBCanvas(80, 24)
+};
 
 // // Used to draw to the display
-ElementDrawer drawer(display);
+ElementDrawer drawer[] {
+    ElementDrawer(framebuffer[0]),
+    ElementDrawer(framebuffer[1])
+};
 
 // // Used to set bitmaps in the scene
 ElementRGBBitmapSetter bmpsetter;
@@ -130,6 +117,92 @@ ElementRGBBitmapSetter eyesclosedsetter;
 
 // // Used to update the elements in the scene
 ElementUpdater updater;
+
+unsigned long last = 0;
+void updateLoop(void * params) {
+
+    // For benchmarking
+    unsigned long before;
+    unsigned long after;
+    unsigned long delta;
+
+    while (true) {
+
+        xSemaphoreTake(xBinarySemaphore, portMAX_DELAY);
+
+        // Swap buffers
+        flipped = !flipped;
+
+        Serial.printf("Clearing %d \n", flipped);
+        framebuffer[flipped].clear();
+
+        xSemaphoreGive(xBinarySemaphore);
+
+        unsigned long now = micros();
+        delta = now - last;
+        
+        // Serial.printf("Loop took %d us\n", delta);
+
+        last = micros();
+
+
+
+        before = micros();
+
+        updater.setTimeDelta(micros());
+        updater.visit(&scene);
+
+        drawer[flipped].visit(&scene);
+
+        if (now / 200000 % 2)
+        {
+            eyesclosedsetter.visit(&scene);
+        }
+        else
+        {
+            bmpsetter.visit(&scene);
+        }
+
+        after = micros();
+        delta = after - before;
+
+        Serial.printf("Updating took %d us\n", delta);
+
+    }
+}
+
+void drawLoop(void * params) {
+    unsigned long begin = 0;
+    unsigned long end = 0;
+    while (true) {
+        begin = micros();
+
+        xSemaphoreTake(xBinarySemaphore, portMAX_DELAY);
+
+        display.clear();
+
+        // Move framebuffer to display
+        Serial.printf("Drawing %d \n", !flipped);
+        auto& cur_framebuffer = framebuffer[!flipped];
+        for (uint32_t x = 0; x < cur_framebuffer.getWidth(); x++) {
+            for (uint32_t y = 0; y < cur_framebuffer.getHeight(); y++) {
+                display.setPixel(x, y, cur_framebuffer.getPixel(x, y));
+            }
+        }
+
+        display.show();
+
+        // delay(1000);
+
+        xSemaphoreGive(xBinarySemaphore);
+
+        end = micros();
+
+        Serial.printf("drawloop took %d us\n", end - begin);
+
+        
+    }
+} 
 
 void setup()
 {
@@ -167,6 +240,27 @@ void setup()
 
   display.setBrightness(32);
 
+  xBinarySemaphore = xSemaphoreCreateBinary();
+
+    xTaskCreatePinnedToCore(
+                    updateLoop,   /* Task function. */
+                    "Task1",     /* name of task. */
+                    10000,       /* Stack size of task */
+                    NULL,        /* parameter of the task */
+                    1,           /* priority of the task */
+                    &UpdateTask,      /* Task handle to keep track of created task */
+                    0);          /* pin task to core 1 */
+
+    xTaskCreatePinnedToCore(
+                drawLoop,   /* Task function. */
+                "Task2",     /* name of task. */
+                10000,       /* Stack size of task */
+                NULL,        /* parameter of the task */
+                1,           /* priority of the task */
+                &DrawingTask,      /* Task handle to keep track of created task */
+                1);          /* pin task to core 1 */
+
+    xSemaphoreGive(xBinarySemaphore);
 }
 
 
@@ -174,43 +268,44 @@ unsigned long prev = 0;
 void loop()
 {
   Serial.printf("Free heap: %d\n", ESP.getFreeHeap());
+  delay(10000);
   // // For updating
-  unsigned long now = micros();
-  // unsigned long updateDelta = now - prev;
-  // unsigned long prev = now;
+//   unsigned long now = micros();
+//   // unsigned long updateDelta = now - prev;
+//   // unsigned long prev = now;
 
-  // For benchmarking
-  unsigned long before;
-  unsigned long after;
-  unsigned long delta;
+//   // For benchmarking
+//   unsigned long before;
+//   unsigned long after;
+//   unsigned long delta;
 
-  display.clear();
+//   display.clear();
 
-  before = micros();
+//   before = micros();
 
-  updater.setTimeDelta(micros());
-  updater.visit(&scene);
+//   updater.setTimeDelta(micros());
+//   updater.visit(&scene);
 
-  drawer.visit(&scene);
+//   drawer.visit(&scene);
 
-  after = micros();
-  delta = after - before;
+//   after = micros();
+//   delta = after - before;
 
-  Serial.printf("Updating took %d us\n", delta);
+//   Serial.printf("Updating took %d us\n", delta);
 
-  display.show();
+//   display.show();
 
-  // // // Update
-  // // before = micros();
+//   // // // Update
+//   // // before = micros();
 
-  if (now / 200000 % 2)
-  {
-    eyesclosedsetter.visit(&scene);
-  }
-  else
-  {
-    bmpsetter.visit(&scene);
-  }
+//   if (now / 200000 % 2)
+//   {
+//     eyesclosedsetter.visit(&scene);
+//   }
+//   else
+//   {
+//     bmpsetter.visit(&scene);
+//   }
 
   // after = micros();
 
