@@ -20,8 +20,8 @@ public:
 
     BitmapElement(
         std::string name,
-        uint32_t draw_x,
-        uint32_t draw_y,
+        uint32_t draw_x = 0,
+        uint32_t draw_y = 0,
         std::initializer_list<Element*> children = {}
     );
 

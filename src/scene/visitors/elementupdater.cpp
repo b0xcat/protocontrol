@@ -33,25 +33,25 @@ void ElementUpdater::visit(TargetFollowerElement* el) {
     // Update children
     follow_children(el);
 
-    // // Render children to internal framebuffer
-    // Scene tmpScene(el->getChildren());
-    // ElementDrawer drawer(el->getTargetFramebuffer());
-    // drawer.visit(&tmpScene);
+    // Render children to internal framebuffer
+    Scene tmpScene(el->getChildren());
+    ElementDrawer drawer(el->getTargetFramebuffer());
+    drawer.visit(&tmpScene);
 
-    // // Calculate frame high and low per column
-    // // el->getTargetFollowerLayer().recalculateTarget(el->getTargetFramebuffer());
-    // el->recalculateLayerTargets(el->getTargetFramebuffer());
-    // // Calculate delta factor
-    // float deltaFactor = (float)delta / 80000;
-    // deltaFactor = min(0.5f, max(deltaFactor, 0.1f));
-    // // Serial.printf("updating with delta factor %.6f \n", deltaFactor);
+    // Calculate frame high and low per column
+    // el->getTargetFollowerLayer().recalculateTarget(el->getTargetFramebuffer());
+    el->recalculateLayerTargets(el->getTargetFramebuffer());
+    // Calculate delta factor
+    float deltaFactor = (float)delta / 80000;
+    deltaFactor = min(0.5f, max(deltaFactor, 0.1f));
+    // Serial.printf("updating with delta factor %.6f \n", deltaFactor);
 
-    // // Move towards target
-    // // el->getTargetFollowerLayer().update(deltaFactor);
-    // el->updateLayers(deltaFactor);
+    // Move towards target
+    // el->getTargetFollowerLayer().update(deltaFactor);
+    el->updateLayers(deltaFactor);
     
-    // // Serial.printf("Rendering (%d, %d) \n", el->getWidth(), el->getHeight());
-    // el->renderToFramebuffer();
+    // Serial.printf("Rendering (%d, %d) \n", el->getWidth(), el->getHeight());
+    el->renderToFramebuffer();
 
     // Also fade colors towards target
     // el->updateColors(deltaFactor);

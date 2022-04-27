@@ -62,6 +62,10 @@ public:
     }
 
     void setPixel(uint16_t x, uint16_t y, CRGB color) {
+        if (color == CRGB {0, 0, 0}) {
+            return;
+        }
+
         uint stringn = 0;
         uint matn = 0;
         for (auto& string: _strings) {
@@ -77,7 +81,7 @@ public:
                     && x < matrix_x + matrix_w 
                     && y < matrix_y + matrix_h
                 ) {
-                    Serial.printf("Setting pixel in str %d, mat %d (%d, %d) -> (%d, %d, %d) \n", stringn, matn, x, y, color.r, color.g, color.b);
+                    // Serial.printf("Setting pixel in str %d, mat %d (%d, %d) -> (%d, %d, %d) \n", stringn, matn, x, y, color.r, color.g, color.b);
                     matrix->setPixel(x - matrix_x, y - matrix_y, color);
                 }
                 matn++;
@@ -105,6 +109,19 @@ public:
         }
     }
 
+    void swap() {
+        for (auto &matrixString: _strings) {
+            
+            DoubleBufferedFastLEDString* dbfls = 
+                dynamic_cast<DoubleBufferedFastLEDString*>(matrixString.get());
+
+            if (dbfls) {
+                dbfls->swap();
+            }
+        }
+    }
+
 };
+
 
 #endif

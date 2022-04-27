@@ -17,7 +17,6 @@ protected:
     std::unique_ptr<CRGB[]> pixels;
     uint32_t num_pixels;
 
-private:
     std::vector<std::unique_ptr<FastLEDMatrix>> matrices;
     std::vector<uint> mat_boundaries;
     std::unique_ptr<CLEDController> controller;
@@ -60,7 +59,7 @@ public:
         }
     }
 
-    void clear() {
+    virtual void clear() {
         memset(pixels.get(), 0, sizeof(CRGB) * num_pixels);
     }
 
@@ -68,12 +67,56 @@ public:
         return matrices;
     }
 
-    void show() {
+    virtual void show() {
         controller->showLeds(brightness);
     }
 
     void setBrightness(uint8_t scale) {
         brightness = scale;
+    }
+};
+
+class DoubleBufferedFastLEDString: public FastLEDString {
+private:
+    std::unique_ptr<CRGB[]> pixels2;
+
+    bool swapped = false;
+
+public: 
+    DoubleBufferedFastLEDString (
+        CLEDController* controller,
+        std::initializer_list<FastLEDMatrix*> mats
+    )
+    : FastLEDString(controller, mats)
+    {
+        pixels2 = std::unique_ptr<CRGB[]>(new CRGB[num_pixels]);
+    }
+
+    void swap() {
+        uint32_t cur_pixel = 0;
+        if (swapped) {
+            for (auto& matrix : matrices) {
+                matrix->fastled_mem = &pixels2[cur_pixel];
+                cur_pixel += (uint32_t)matrix->getHeight() * (uint32_t)matrix->getWidth();
+            }
+            controller->setLeds(pixels2.get(), num_pixels);
+        } else {
+            for (auto& matrix : matrices) {
+                matrix->fastled_mem = &pixels[cur_pixel];
+                cur_pixel += (uint32_t)matrix->getHeight() * (uint32_t)matrix->getWidth();
+            }
+            controller->setLeds(pixels.get(), num_pixels);
+        }
+        swapped != swapped;
+    }
+
+
+    void clear() override {
+        if (swapped) {
+            memset(pixels2.get(), 0, sizeof(CRGB) * num_pixels);
+        } else {
+            memset(pixels.get(), 0, sizeof(CRGB) * num_pixels);
+        }
     }
 };
 

@@ -48,9 +48,11 @@ inline uint16_t convertCRGBto565(CRGB& in) {
 }
 
 inline void convert565toCRGB(uint16_t in, CRGB& out) {
-  out.r = ((((in >> 11) & 0x1F) * 527) + 23) >> 6;
-  out.g = ((((in >> 5) & 0x3F) * 259) + 33) >> 6;
-  out.b = (((in & 0x1F) * 527) + 23) >> 6;
+  uint32_t tmp = expandColor(in);
+  char* tmp_bytes = static_cast<char*>(static_cast<void*>(&tmp));
+  out.r = tmp_bytes[2];
+  out.g = tmp_bytes[0];
+  out.b = tmp_bytes[1];
 }
 
 

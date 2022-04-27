@@ -5,6 +5,7 @@
 
 #include <initializer_list>
 #include <Adafruit_GFX.h>
+#include "crgbcanvas.h"
 #include "scene/elements/element.h"
 #include "scene/visitors/elementvisitor.h"
 #include "bitmaps.h"
@@ -25,8 +26,8 @@ public:
     float* targetHigh;
     float* targetLow;
 private:
-    uint16_t* curColors;
-    uint16_t* targetColors;
+    CRGB* curColors;
+    CRGB* targetColors;
     uint16_t width;
     bool enabled;
 
@@ -49,8 +50,8 @@ public:
     , curLow(new float[width])
     , targetHigh(new float[width])
     , targetLow(new float[width])
-    , curColors(new uint16_t[width])
-    , targetColors(new uint16_t[width])
+    , curColors(new CRGB[width])
+    , targetColors(new CRGB[width])
     , width(width)
     , enabled(enabled)
     {
@@ -70,7 +71,7 @@ public:
         return enabled;
     }
 
-    void setColor(uint16_t idx, uint16_t color) {
+    void setColor(uint16_t idx, CRGB color) {
         targetColors[idx] = color;
     }
 
@@ -106,10 +107,9 @@ public:
         return requested >= low && requested <= high;
     }
 
-    uint16_t getColor(uint16_t col) {
-        uint16_t cur_color = curColors[col];
+    CRGB getColor(uint16_t col) {
         // Serial.printf("Getting color for column %d: %d", col, cur_color);
-        return cur_color;
+        return curColors[col];
     }
 
     void update(float deltaFactor) {
@@ -174,8 +174,8 @@ static const uint32_t n_layers = 8;
 
 class TargetFollowerElement: public Element, public IPixelReadable {
 private:
-    std::unique_ptr<GFXcanvas16> target_framebuffer;
-    std::unique_ptr<GFXcanvas16> current_framebuffer;
+    std::unique_ptr<CRGBCanvas> target_framebuffer;
+    std::unique_ptr<CRGBCanvas> current_framebuffer;
     std::array<TargetFollowerLayer*, n_layers> layers;
 
     // std::unique_ptr<TargetFollowerLayer> layer;
@@ -198,8 +198,8 @@ public:
         std::initializer_list<Element*> children = {}
     ) 
     : Element(name, children)
-    , target_framebuffer(new GFXcanvas16(width, height))
-    , current_framebuffer(new GFXcanvas16(width, height)) 
+    , target_framebuffer(new CRGBCanvas(width, height))
+    , current_framebuffer(new CRGBCanvas(width, height)) 
     // , layer(new TargetFollowerLayer(width, true))
     , width(width)
     , height(height)
@@ -211,12 +211,12 @@ public:
         }
     }
 
-    GFXcanvas16& getTargetFramebuffer() {
+    CRGBCanvas& getTargetFramebuffer() {
         return *target_framebuffer.get();
     }
 
     void renderToFramebuffer() {
-        current_framebuffer->fillScreen(0);
+        current_framebuffer->clear();
         uint layerno = 0;
         for (auto &layer: layers) {
             if (layer->isEnabled()) {
@@ -256,10 +256,10 @@ public:
         }
     }
 
-    void recalculateLayerTargets(GFXcanvas16 &target) {
+    void recalculateLayerTargets(CRGBCanvas &target) {
         uint32_t max_mask_layer_idx = 0;
 
-        for (uint16_t col = 0; col < target.width(); col++) {
+        for (uint16_t col = 0; col < target.getWidth(); col++) {
             // TODO: fix this bullshit
             
             // uint16_t layer_idx = 0;
@@ -312,14 +312,14 @@ public:
             int32_t mask_first = -1;
             int32_t mask_last = -1;
 
-            uint16_t last_pixel = 0;
-            uint16_t cur_pixel = 0;
-            uint16_t col_color = 0;
+            CRGB last_pixel = 0;
+            CRGB cur_pixel = 0;
+            CRGB col_color = 0;
 
-            for (uint16_t row = 0; row < target.height(); row++) {
+            for (uint16_t row = 0; row < target.getHeight(); row++) {
                 
                 cur_pixel = target.getPixel(col, row);
-
+                // Serial.printf("CUR PIXEL %d %d %d\n", cur_pixel.r, cur_pixel.g, cur_pixel.b);
                 if (cur_pixel && col_first == -1) {
                     col_first = row;
                 }
@@ -351,7 +351,7 @@ public:
 
                 last_pixel = cur_pixel;
             }
-
+            // Serial.printf("col color (%d, %d, %d)\n", col_color.r, col_color.g, col_color.b);
             layers[0]->setColor(col, col_color);
             // layers[0]->targetLow[col] = col_first;
             // layers[0]->targetHigh[col] = col_last;
@@ -407,10 +407,19 @@ public:
     //     } 
     // }
 
-    CRGB getPixel(int16_t x, int16_t y) const {
-        CRGB tmp;
-        convert565toCRGB(current_framebuffer->getPixel(x, y), tmp);
-        return tmp;
+    CRGB getPixel(uint16_t x, uint16_t y) const{
+        // CRGB tmp;
+        // uint16_t tmp_565 = current_framebuffer->getPixel(x, y);
+
+        // convert565toCRGB(tmp_565, tmp);
+
+        // // if (tmp_565) {
+        // //     tmp = CRGB(255, 0, 0);
+        // // }
+
+        // Serial.printf("PIXEL(%d, %d) - (%d, %d, %d)\n", x, y, tmp.r, tmp.g, tmp.b);
+        // return tmp;
+        return current_framebuffer->getPixel(x, y);
         //TODO: wtf
         //return target_framebuffer->getPixel(x, y);
         // First check if it is masked or not

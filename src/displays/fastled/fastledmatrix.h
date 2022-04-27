@@ -10,6 +10,7 @@
 
 class FastLEDMatrix : public IPixelReadWriteable {
     friend class FastLEDString;
+    friend class DoubleBufferedFastLEDString;
 private:
     CRGB *fastled_mem;
 

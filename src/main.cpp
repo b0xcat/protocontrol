@@ -26,12 +26,12 @@
 #include "scene/scene.h"
 #include "scene/elements/bitmapelement.h"
 // #include "scene/elements/adagfxelement.h"
-// #include "scene/elements/targetfollowerelement.h"
+#include "scene/elements/targetfollowerelement.h"
 
 // #include "scene/visitors/elementprinter.h"
 #include "scene/visitors/elementrgbbitmapsetter.h"
 #include "scene/visitors/elementdrawer.h"
-// #include "scene/visitors/elementupdater.h"
+#include "scene/visitors/elementupdater.h"
 
 #include "scene/modifiers/mirror.h"
 #include "scene/modifiers/rainbow.h"
@@ -41,35 +41,58 @@
 #include "displays/fastled/fastledstring.h"
 #include "displays/fastled/fastledmatrix.h"
 
+#include "crgbcanvas.h"
+
+// For synchronization of update and drawing loop
+SemaphoreHandle_t xBinarySemaphore;
+
+TaskHandle_t DrawingTask;
+TaskHandle_t UpdateTask;
+
 // Define the layout of our physical display
 FastLEDDisplay display {
-  new FastLEDString { 
-    new WS2812<16, GRB>, {
-      new FastLEDMatrix {16, 8,  0,  0,  0},
-      new FastLEDMatrix {32, 8,  0, 16,  0},
-      new FastLEDMatrix {8,  8,  32, 8,  0},
-    }
-  }, 
-  new FastLEDString { 
-    new WS2812<17, GRB>, {
-      new FastLEDMatrix {16, 8,  64,  0,  2},
-      new FastLEDMatrix {32, 8,  48, 16,  2},
-      new FastLEDMatrix {8,  8,  40,  8,  2},
-    }
-  }
+    new FastLEDString{
+        new WS2812<16, GRB>, {
+            new FastLEDMatrix{16, 8, 0, 0, 0},
+            new FastLEDMatrix{32, 8, 0, 16, 0},
+            new FastLEDMatrix{8, 8, 32, 8, 0},
+        }},
+    new FastLEDString{
+        new WS2812<17, GRB>, {
+            new FastLEDMatrix{16, 8, 64, 0, 2},
+            new FastLEDMatrix{32, 8, 48, 16, 2},
+            new FastLEDMatrix{8, 8, 40, 8, 2},
+        }}
 };
 
 #define NUM_LEDS_SIDEPANEL 15 + 8 + 16 + 12
 
 ProtoControl::BitmapManager<256> bitmapManager;
 
-Scene scene {
-  new Rainbow<MirrorHorizontal<BitmapElement>> {"eye_l",     0,  0},
-  new Rainbow<MirrorHorizontal<BitmapElement>> {"nose_l",   32,  8},
-  new Rainbow<MirrorHorizontal<BitmapElement>> {"mouth_l",   0, 16},
-  new Rainbow<BitmapElement>                   {"eye_r",    64,  0},
-  new Rainbow<BitmapElement>                   {"nose_r",   40,  8},
-  new Rainbow<BitmapElement>                   {"mouth_r",  48, 16},
+Scene scene{
+
+    new Rainbow<TargetFollowerElement>{"eye_l_follower", 16, 8, 0, 0, {
+        new MirrorHorizontal<BitmapElement>{"eye_l"},
+    }},
+    new Rainbow<TargetFollowerElement>{"eye_r_follower", 16, 8, 64, 0, {
+        new BitmapElement{"eye_r"},
+    }},
+
+    new Rainbow<TargetFollowerElement> {"nose_l_follower", 8, 8, 32, 8, {
+        new MirrorHorizontal<BitmapElement>{"nose_l"},
+    }},
+    new Rainbow<TargetFollowerElement> {"nose_r_follower", 8, 8, 40, 8, {
+        new BitmapElement{"nose_r"},
+    }},
+    
+
+    new Rainbow<TargetFollowerElement> {"mouth_l_follower", 32, 8, 0, 16, {
+        new MirrorHorizontal<BitmapElement>{"mouth_l"},
+    }},
+    new Rainbow<TargetFollowerElement> {"mouth_r_follower", 32, 8, 48, 16, {
+        new Rainbow<BitmapElement>{"mouth_r"},
+    }}
+    
 };
 
 // Scene scene {
@@ -100,13 +123,13 @@ ElementDrawer drawer(display);
 
 // // Used to set bitmaps in the scene
 ElementRGBBitmapSetter bmpsetter;
-// ElementRGBBitmapSetter eyesclosedsetter;
+ElementRGBBitmapSetter eyesclosedsetter;
 
 // // Used to print a text representation of the scene
 // ElementPrinter ep(Serial);
 
 // // Used to update the elements in the scene
-// ElementUpdater updater;
+ElementUpdater updater;
 
 void setup()
 {
@@ -114,9 +137,12 @@ void setup()
   Serial.begin(115200);
 
   // Set up littleFS
-  if(!LITTLEFS.begin(true)){
-      Serial.println("LittleFS Mount Failed");
-      while(true) {}
+  if (!LITTLEFS.begin(true))
+  {
+    Serial.println("LittleFS Mount Failed");
+    while (true)
+    {
+    }
   }
 
   // Collect and load the bitmaps in the LITTLEFS /565 folder
@@ -125,72 +151,66 @@ void setup()
   // ep.visit(&scene);
 
   bmpsetter
-    .add("eye_r", bitmapManager.get("/565/proto_eye"))
-    .add("eye_l", bitmapManager.get("/565/proto_eye"))
-    .add("nose_r", bitmapManager.get("/565/proto_nose"))
-    .add("nose_l", bitmapManager.get("/565/proto_nose"))
-    .add("mouth_r", bitmapManager.get("/565/proto_mouth"))
-    .add("mouth_l", bitmapManager.get("/565/proto_mouth"))
-    .add("ear_l", bitmapManager.get("/565/proto_ear"))
-    .add("ear_r", bitmapManager.get("/565/proto_ear"))
-    .visit(&scene);
+      .add("eye_r", bitmapManager.get("/565/proto_eye"))
+      .add("eye_l", bitmapManager.get("/565/proto_eye"))
+      .add("nose_r", bitmapManager.get("/565/proto_nose"))
+      .add("nose_l", bitmapManager.get("/565/proto_nose"))
+      .add("mouth_r", bitmapManager.get("/565/proto_mouth"))
+      .add("mouth_l", bitmapManager.get("/565/proto_mouth"))
+      .add("ear_l", bitmapManager.get("/565/proto_ear"))
+      .add("ear_r", bitmapManager.get("/565/proto_ear"))
+      .visit(&scene);
 
-  // eyesclosedsetter
-  //   .add("eye_r", bitmapManager.get("/565/proto_eye_closed"))
-  //   .add("eye_l", bitmapManager.get("/565/proto_eye_closed"));
+  eyesclosedsetter
+      .add("eye_r", bitmapManager.get("/565/proto_eye_closed"))
+      .add("eye_l", bitmapManager.get("/565/proto_eye_closed"));
 
   display.setBrightness(32);
 
-  display.fill({32, 32, 32});
-  display.show();
-  delay(200);
-  display.clear();
-  display.show();
-  delay(200);
-  display.fill({32, 32, 32});
-  display.show();
-  delay(200);
-  display.clear();
-  display.show();
-  delay(200);
-  display.fill({32, 32, 32});
-  display.show();
-  delay(200);
-  display.clear();
-  display.show();
-  delay(200);
-
-
-  display.clear();
-  drawer.visit(&scene);
-  display.show();
-  
 }
+
 
 unsigned long prev = 0;
 void loop()
 {
+  Serial.printf("Free heap: %d\n", ESP.getFreeHeap());
   // // For updating
-  // unsigned long now = micros();
+  unsigned long now = micros();
   // unsigned long updateDelta = now - prev;
   // unsigned long prev = now;
 
-  // // For benchmarking
-  // unsigned long before;
-  // unsigned long after;
-  // unsigned long delta;
+  // For benchmarking
+  unsigned long before;
+  unsigned long after;
+  unsigned long delta;
 
-  // // Update
-  // before = micros();
+  display.clear();
 
-  // updater.setTimeDelta(micros());
-  // updater.visit(&scene);
+  before = micros();
 
-  // if (now / 200000 % 2) {
-  //   eyesclosedsetter.visit(&scene);
-  // } else {
-  //   bmpsetter.visit(&scene);
-  // }
+  updater.setTimeDelta(micros());
+  updater.visit(&scene);
+
+  drawer.visit(&scene);
+
+  after = micros();
+  delta = after - before;
+
+  Serial.printf("Updating took %d us\n", delta);
+
+  display.show();
+
+  // // // Update
+  // // before = micros();
+
+  if (now / 200000 % 2)
+  {
+    eyesclosedsetter.visit(&scene);
+  }
+  else
+  {
+    bmpsetter.visit(&scene);
+  }
 
   // after = micros();
 
