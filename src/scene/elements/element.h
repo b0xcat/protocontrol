@@ -6,6 +6,8 @@
 #include <string>
 #include "scene/visitors/elementvisitor.h"
 
+#include "ipixel.h"
+
 class Element {
     
 protected:
@@ -32,11 +34,11 @@ public:
 };
 
 // For modifier support
-class IPixelReadable {
-public:
-    virtual uint16_t getPixel(int16_t x, int16_t y) = 0;
-    virtual uint16_t getWidth() = 0;
-    virtual uint16_t getHeight() = 0;
-};
+// class IPixelReadable {
+// public:
+//     virtual uint16_t getPixel(int16_t x, int16_t y) = 0;
+//     virtual uint16_t getWidth() = 0;
+//     virtual uint16_t getHeight() = 0;
+// };
 
 #endif

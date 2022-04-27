@@ -7,10 +7,11 @@
 #include <Vector.h>
 
 #include "ws2812string.h"
+#include "ipixel.h"
 
 static const uint32_t max_matrix_strings = 8;
 
-class WS2812Display : public Adafruit_GFX {
+class WS2812Display : public Adafruit_GFX, public IPixelWriteable {
 private:
     std::vector<std::unique_ptr<WS2812String>> matrix_strings;
     std::vector<uint32_t> string_boundaries;

@@ -4,14 +4,17 @@
 #include <stdint.h>
 #include <etl/map.h>
 #include <FS.h>
+#include <FastLED.h>
 
+#include "ipixel.h"
+#include "colorconversion.h"
 
 namespace ProtoControl {
 	enum BitmapType: uint8_t {
 		ColMajor565
 	};
 
-	class IBitmap {
+	class IBitmap: public IPixelReadWriteable {
 	protected:
 		std::string path;
 	public:
@@ -19,10 +22,7 @@ namespace ProtoControl {
 		: path(path)
 		{}
 
-		virtual uint16_t getPixel(uint16_t x, uint16_t y) = 0;
-		virtual void setPixel(uint16_t x, uint16_t y, uint16_t color) = 0;
-		virtual uint16_t getWidth() = 0;
-		virtual uint16_t getHeight() = 0;
+
 		virtual void save() = 0;
 		virtual void load() = 0;
 		
@@ -34,6 +34,7 @@ namespace ProtoControl {
 	// Dumb wrapper around const uint16_t[] bitmaps
 	class Static565Bitmap: public IBitmap {
 	private:
+		std::unique_ptr<CRGB[]> crgb_buf;
 		const uint16_t* buf;
 		uint16_t w;
 		uint16_t h;
@@ -41,27 +42,31 @@ namespace ProtoControl {
 	public:
 		Static565Bitmap(const uint16_t* bitmap, uint16_t w, uint16_t h)
 		: IBitmap("none")
+		, crgb_buf(std::make_unique<CRGB[]>(w * h))
 		, buf(bitmap)
 		, w(w)
-		, h(h) {}
+		, h(h) {
+			for(uint32_t i = 0; i < w * h; i++) {
+				convert565toCRGB(buf[i], crgb_buf[i]);
+			}
+		}
 
-		uint16_t getPixel(uint16_t x, uint16_t y) override {
+		CRGB getPixel(uint16_t x, uint16_t y) const {
 			// Row major
-			return buf[x + y * w];
+			return crgb_buf[x + y * w];
 		}
 
-		void setPixel(uint16_t x, uint16_t y, uint16_t color) override {
-			// Not modifiable >:( 
-		}
-
-		uint16_t getWidth() {
+		uint16_t getWidth() const {
 			return w;
 		}
 
-		uint16_t getHeight() {
+		uint16_t getHeight() const {
 			return h;
 		}
 
+		// Noops
+		// void setPixel(int16_t x, int16_t y, CRGB color) override {}
+		void clear() {}
 		void save() {}
 		void load() {}
 	};
@@ -103,20 +108,26 @@ namespace ProtoControl {
 			} 
 		}
 
-		uint16_t getPixel(uint16_t x, uint16_t y) override {
-			return buf[x * h + y];
+		CRGB getPixel(uint16_t x, uint16_t y) const {
+			CRGB r;
+			convert565toCRGB(buf[x * h + y], r);
+			return r;
 		}
 
-		void setPixel(uint16_t x, uint16_t y, uint16_t color) override {
-			buf[x * h + y] = color;
+		void setPixel(uint16_t x, uint16_t y, CRGB color) {
+			buf[x * h + y] = convertCRGBto565(color);
 		}
 
-		uint16_t getWidth() {
+		uint16_t getWidth() const {
 			return w;
 		}
 
-		uint16_t getHeight() {
+		uint16_t getHeight() const {
 			return h;
+		}
+
+		void clear() {
+			memset(buf, 0, w * h * sizeof(uint16_t));
 		}
 
 		void save() override {
