@@ -25,7 +25,7 @@ public:
         std::initializer_list<Element*> children = {}
     );
 
-    void setBitmap(ProtoControl::IBitmap* bitmap) {
+    virtual void setBitmap(ProtoControl::IBitmap* bitmap) {
         this->bitmap = bitmap;
     }
 

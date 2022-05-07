@@ -35,6 +35,7 @@
 
 #include "scene/modifiers/mirror.h"
 #include "scene/modifiers/rainbow.h"
+#include "scene/modifiers/blink.h"
 
 #include "bitmaps.h"
 #include "displays/fastled/fastleddisplay.h"
@@ -69,27 +70,29 @@ FastLEDDisplay display {
 
 ProtoControl::BitmapManager<256> bitmapManager;
 
+BlinkController blinkController(false, 250, 8000, 2000);
+
 Scene scene{
 
-    new TargetFollowerElement{"eye_l_follower", 16, 8, 0, 0, {
-        new MirrorHorizontal<BitmapElement>{"eye_l"},
+    new Rainbow<TargetFollowerElement> {"eye_l_follower", 16, 8, 0, 0, {
+        new Blink<MirrorHorizontal<BitmapElement>>{blinkController, "eye_l"},
     }},
-    new TargetFollowerElement{"eye_r_follower", 16, 8, 64, 0, {
-        new BitmapElement{"eye_r"},
+    new Rainbow<TargetFollowerElement> {"eye_r_follower", 16, 8, 64, 0, {
+        new Blink<BitmapElement>{blinkController, "eye_r"},
     }},
 
-    new TargetFollowerElement {"nose_l_follower", 8, 8, 32, 8, {
+    new Rainbow<TargetFollowerElement> {"nose_l_follower", 8, 8, 32, 8, {
         new MirrorHorizontal<BitmapElement>{"nose_l"},
     }},
-    new TargetFollowerElement {"nose_r_follower", 8, 8, 40, 8, {
+    new Rainbow<TargetFollowerElement> {"nose_r_follower", 8, 8, 40, 8, {
         new BitmapElement{"nose_r"},
     }},
     
 
-    new TargetFollowerElement {"mouth_l_follower", 32, 8, 0, 16, {
+    new Rainbow<TargetFollowerElement> {"mouth_l_follower", 32, 8, 0, 16, {
         new MirrorHorizontal<BitmapElement>{"mouth_l"},
     }},
-    new TargetFollowerElement {"mouth_r_follower", 32, 8, 48, 16, {
+    new Rainbow<TargetFollowerElement> {"mouth_r_follower", 32, 8, 48, 16, {
         new BitmapElement{"mouth_r"},
     }}
     
@@ -97,15 +100,15 @@ Scene scene{
 
 
 volatile bool flipped = false;
-CRGBCanvas framebuffer[] {
-    CRGBCanvas(80, 24),
-    CRGBCanvas(80, 24)
+CRGBCanvas* framebuffer[] {
+    new CRGBCanvas(80, 24),
+    new CRGBCanvas(80, 24)
 };
 
 // // Used to draw to the display
 ElementDrawer drawer[] {
-    ElementDrawer(framebuffer[0]),
-    ElementDrawer(framebuffer[1])
+    ElementDrawer(*framebuffer[0]),
+    ElementDrawer(*framebuffer[1])
 };
 
 // // Used to set bitmaps in the scene
@@ -136,7 +139,7 @@ void updateLoop(void * params) {
         flipped = !flipped;
 
         // Serial.printf("Clearing %d \n", flipped);
-        framebuffer[flipped].clear();
+        framebuffer[flipped]->clear();
 
         xSemaphoreGive(xBinarySemaphore);
 
@@ -152,19 +155,10 @@ void updateLoop(void * params) {
 
         drawer[flipped].visit(&scene);
 
-        if (now / 200000 % 2)
-        {
-            eyesclosedsetter.visit(&scene);
-        }
-        else
-        {
-            bmpsetter.visit(&scene);
-        }
-
         after = micros();
         delta = after - before;
 
-        // Serial.printf("Updating took %d us\n", delta);
+        Serial.printf("Updating took %d us\n", delta);
 
     }
 }
@@ -182,9 +176,9 @@ void drawLoop(void * params) {
         // Move framebuffer to display
         // Serial.printf("Drawing %d \n", !flipped);
         auto& cur_framebuffer = framebuffer[!flipped];
-        for (uint32_t x = 0; x < cur_framebuffer.getWidth(); x++) {
-            for (uint32_t y = 0; y < cur_framebuffer.getHeight(); y++) {
-                display.setPixel(x, y, cur_framebuffer.getPixel(x, y));
+        for (uint32_t x = 0; x < cur_framebuffer->getWidth(); x++) {
+            for (uint32_t y = 0; y < cur_framebuffer->getHeight(); y++) {
+                display.setPixel(x, y, cur_framebuffer->getPixel(x, y));
             }
         }
 
@@ -197,7 +191,7 @@ void drawLoop(void * params) {
 
         end = micros();
 
-        // Serial.printf("drawloop took %d us\n", end - begin);
+        Serial.printf("drawloop took %d us\n", end - begin);
 
         
     }
@@ -206,7 +200,7 @@ void drawLoop(void * params) {
 void setup()
 {
   esp_log_level_set("*", ESP_LOG_VERBOSE);
-  Serial.begin(921600);
+  Serial.begin(115200);
 
   // Set up littleFS
   if (!LITTLEFS.begin(true))
@@ -267,71 +261,5 @@ unsigned long prev = 0;
 void loop()
 {
   Serial.printf("Free heap: %d\n", ESP.getFreeHeap());
-  delay(10000);
-  // // For updating
-//   unsigned long now = micros();
-//   // unsigned long updateDelta = now - prev;
-//   // unsigned long prev = now;
-
-//   // For benchmarking
-//   unsigned long before;
-//   unsigned long after;
-//   unsigned long delta;
-
-//   display.clear();
-
-//   before = micros();
-
-//   updater.setTimeDelta(micros());
-//   updater.visit(&scene);
-
-//   drawer.visit(&scene);
-
-//   after = micros();
-//   delta = after - before;
-
-//   Serial.printf("Updating took %d us\n", delta);
-
-//   display.show();
-
-//   // // // Update
-//   // // before = micros();
-
-//   if (now / 200000 % 2)
-//   {
-//     eyesclosedsetter.visit(&scene);
-//   }
-//   else
-//   {
-//     bmpsetter.visit(&scene);
-//   }
-
-  // after = micros();
-
-  // delta = after - before;
-  // Serial.print("Updating took ");
-  // Serial.print(delta);
-  // Serial.println(" us");
-
-  // // Clear
-  // before = micros();
-  // display.clear();
-  // after = micros();
-
-  // delta = after - before;
-  // Serial.print("Clearing took ");
-  // Serial.print(delta);
-  // Serial.println(" us");
-
-  // // Draw
-  // before = micros();
-  // drawer.visit(&scene);
-  // after = micros();
-
-  // delta = after - before;
-  // Serial.print("Drawing took ");
-  // Serial.print(delta);
-  // Serial.println(" us");
-
-  // display.show();
+  delay(1000);
 }

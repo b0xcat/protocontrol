@@ -30,14 +30,14 @@ public:
     {}
 
     CRGB getPixel(uint16_t x, uint16_t y) const override {
-        CHSV in(count / 100 + x * y, 255, 255);
-        CRGB out;
-
         uint16_t cur_color = T::getPixel(x, y);
 
         if (cur_color == 0) {
             return cur_color;
         }
+
+        CHSV in(count / 100 + x * y, 255, 255);
+        CRGB out;
 
         count++;
 
