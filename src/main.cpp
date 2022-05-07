@@ -71,26 +71,26 @@ ProtoControl::BitmapManager<256> bitmapManager;
 
 Scene scene{
 
-    new Rainbow<TargetFollowerElement>{"eye_l_follower", 16, 8, 0, 0, {
+    new TargetFollowerElement{"eye_l_follower", 16, 8, 0, 0, {
         new MirrorHorizontal<BitmapElement>{"eye_l"},
     }},
-    new Rainbow<TargetFollowerElement>{"eye_r_follower", 16, 8, 64, 0, {
+    new TargetFollowerElement{"eye_r_follower", 16, 8, 64, 0, {
         new BitmapElement{"eye_r"},
     }},
 
-    new Rainbow<TargetFollowerElement> {"nose_l_follower", 8, 8, 32, 8, {
+    new TargetFollowerElement {"nose_l_follower", 8, 8, 32, 8, {
         new MirrorHorizontal<BitmapElement>{"nose_l"},
     }},
-    new Rainbow<TargetFollowerElement> {"nose_r_follower", 8, 8, 40, 8, {
+    new TargetFollowerElement {"nose_r_follower", 8, 8, 40, 8, {
         new BitmapElement{"nose_r"},
     }},
     
 
-    new Rainbow<TargetFollowerElement> {"mouth_l_follower", 32, 8, 0, 16, {
+    new TargetFollowerElement {"mouth_l_follower", 32, 8, 0, 16, {
         new MirrorHorizontal<BitmapElement>{"mouth_l"},
     }},
-    new Rainbow<TargetFollowerElement> {"mouth_r_follower", 32, 8, 48, 16, {
-        new Rainbow<BitmapElement>{"mouth_r"},
+    new TargetFollowerElement {"mouth_r_follower", 32, 8, 48, 16, {
+        new BitmapElement{"mouth_r"},
     }}
     
 };
@@ -130,10 +130,12 @@ void updateLoop(void * params) {
 
         xSemaphoreTake(xBinarySemaphore, portMAX_DELAY);
 
+        before = micros();
+
         // Swap buffers
         flipped = !flipped;
 
-        Serial.printf("Clearing %d \n", flipped);
+        // Serial.printf("Clearing %d \n", flipped);
         framebuffer[flipped].clear();
 
         xSemaphoreGive(xBinarySemaphore);
@@ -144,10 +146,6 @@ void updateLoop(void * params) {
         // Serial.printf("Loop took %d us\n", delta);
 
         last = micros();
-
-
-
-        before = micros();
 
         updater.setTimeDelta(micros());
         updater.visit(&scene);
@@ -166,7 +164,7 @@ void updateLoop(void * params) {
         after = micros();
         delta = after - before;
 
-        Serial.printf("Updating took %d us\n", delta);
+        // Serial.printf("Updating took %d us\n", delta);
 
     }
 }
@@ -182,7 +180,7 @@ void drawLoop(void * params) {
         display.clear();
 
         // Move framebuffer to display
-        Serial.printf("Drawing %d \n", !flipped);
+        // Serial.printf("Drawing %d \n", !flipped);
         auto& cur_framebuffer = framebuffer[!flipped];
         for (uint32_t x = 0; x < cur_framebuffer.getWidth(); x++) {
             for (uint32_t y = 0; y < cur_framebuffer.getHeight(); y++) {
@@ -195,10 +193,11 @@ void drawLoop(void * params) {
         // delay(1000);
 
         xSemaphoreGive(xBinarySemaphore);
+        delayMicroseconds(100);
 
         end = micros();
 
-        Serial.printf("drawloop took %d us\n", end - begin);
+        // Serial.printf("drawloop took %d us\n", end - begin);
 
         
     }
@@ -207,7 +206,7 @@ void drawLoop(void * params) {
 void setup()
 {
   esp_log_level_set("*", ESP_LOG_VERBOSE);
-  Serial.begin(115200);
+  Serial.begin(921600);
 
   // Set up littleFS
   if (!LITTLEFS.begin(true))
