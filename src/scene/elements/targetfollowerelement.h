@@ -12,6 +12,8 @@
 #include "scene/scene.h"
 #include "colorconversion.h"
 #include <etl/deque.h>
+#include <etl/set.h>
+#include <etl/vector.h>
 
 inline int round(float x) {
     return x >=0 ? (int)((x)+0.5) : (int)((x)-0.5);
@@ -216,6 +218,7 @@ public:
     }
 
     void renderToFramebuffer() {
+        //Serial.printf("Rendering %s to framebuffer\n", this->getName().c_str());
         current_framebuffer->clear();
         uint layerno = 0;
         for (auto &layer: layers) {
@@ -232,11 +235,12 @@ public:
                     // Serial.printf("layerno: %d, lowf: %f, highf: %f \n", layerno, _low, _high);
 
                     int low = layer->getLow(col) + 0.5f;
-                    int high = layer->getHigh(col) + 0.5f;
+                    int high = layer->getHigh(col) - 0.5f;
+                    CRGB color = layer->getColor(col);
                     
-                    // Serial.printf("low: %d, high: %d \n", low, high);
+                    //Serial.printf("drawing low: %d, high: %d, color: (%d, %d, %d) \n", low, high, color.r, color.g, color.b);
                     current_framebuffer->drawFastVLine(
-                        col, low, (high - low) + 1, layer->getColor(col)
+                        col, low, (high - low) + 1, color
                     );
                 }
 
@@ -256,183 +260,211 @@ public:
         }
     }
 
-    void recalculateLayerTargets(CRGBCanvas &target) {
-        uint32_t max_mask_layer_idx = 0;
+private:
+    void process_sublayer_column(const etl::vector<CRGB, n_layers> &column, 
+                                    uint32_t col_idx,
+                                    uint32_t start_i,
+                                    uint32_t stop_i,
+                                    uint32_t layer_idx) {
+        CRGB base_color = column.at(start_i);
+        CRGB layer_color = CRGB {0, 0, 0};
+        int32_t min_i = start_i;
+        int32_t max_i = stop_i;
 
-        for (uint16_t col = 0; col < target.getWidth(); col++) {
-            // TODO: fix this bullshit
-            
-            // uint16_t layer_idx = 0;
-            // etl::deque<std::tuple<int, int, uint16_t>, n_layers> deq;
+        for (uint32_t i = start_i; i < stop_i; i++) {
+            CRGB cur_color = column[i];
 
-            // for (uint16_t row = 0; row < target.height(); row++) {
-
-            //     uint16_t cur_pixel = target.getPixel(col, row);
-
-            //     if (deq.empty()) {
-
-            //         if (cur_pixel) {
-            //             // find last pixel in this column with the same color
-            //             uint16_t row_same_col = row;
-            //             for (uint16_t row_inner = row; row_inner < target.height(); row_inner++) {
-            //                 if (target.getPixel(col, row_inner) == cur_pixel) {
-            //                     row_same_col = row_inner;
-            //                 }
-            //             }
-            //             deq.push_back(std::make_tuple(row, row_same_col, cur_pixel));
-            //         }
-
-            //     } else {
-
-            //         auto &prev_pixel = deque.back();
-            //         uint16_t prev_color = std::get<1>(prev_pixel);
-
-            //         if (cur_pixel != prev_color) {
-            //             // find last pixel in this column with the same color
-            //             uint16_t row_same_col = row;
-            //             for (uint16_t row_inner = row; row_inner < target.height(); row_inner++) {
-            //                 if (target.getPixel(col, row_inner) == cur_pixel) {
-            //                     row_same_col = row_inner;
-            //                 }
-            //             }
-            //             deq.push_back(std::make_tuple(row, row_same_col, cur_pixel));
-            //         }
-            //     }
-                
-
-
-            // }
-
-            // Volatile as workaround for compiler bug, seems related to
-            // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=66358 ?
-            volatile int16_t col_first = -1;
-            volatile int16_t col_last = -1;
-
-            uint32_t mask_layer_idx = 1;
-            int32_t mask_first = -1;
-            int32_t mask_last = -1;
-
-            CRGB last_pixel = 0;
-            CRGB cur_pixel = 0;
-            CRGB col_color = 0;
-
-            for (uint16_t row = 0; row < target.getHeight(); row++) {
-                
-                cur_pixel = target.getPixel(col, row);
-                // Serial.printf("CUR PIXEL %d %d %d\n", cur_pixel.r, cur_pixel.g, cur_pixel.b);
-                if (cur_pixel && col_first == -1) {
-                    col_first = row;
-                }
-
-                if (cur_pixel) {
-                    col_last = row;
-                    col_color = cur_pixel;
-                }
-
-
-                if (col_first != -1 && mask_first == -1 && cur_pixel != last_pixel) {
-                    mask_first = row;
-                }
-                if (col_first != -1 && mask_first != -1 && cur_pixel != last_pixel) {
-                    mask_last = row;
-                }
-        
-
-                if (mask_first != -1 && mask_last != -1) {
-                    layers[mask_layer_idx]->setColor(col, cur_pixel);
-                    layers[mask_layer_idx]->setHigh(col, mask_last);
-                    layers[mask_layer_idx]->setLow(col, mask_first);
-
-                    mask_first = -1;
-                    mask_last = -1;
-                    max_mask_layer_idx = max(mask_layer_idx, max_mask_layer_idx);
-                    mask_layer_idx++;
-                }
-
-                last_pixel = cur_pixel;
+            if (min_i == start_i && cur_color != base_color) {
+                min_i = i;
+                layer_color = cur_color;
             }
-            // Serial.printf("col color (%d, %d, %d)\n", col_color.r, col_color.g, col_color.b);
-            layers[0]->setColor(col, col_color);
-            // layers[0]->targetLow[col] = col_first;
-            // layers[0]->targetHigh[col] = col_last;
-            layers[0]->setHigh(col, col_last);
-            layers[0]->setLow(col, col_first);
 
-            // Clear remaining layers
-            for (uint32_t i = mask_layer_idx; i < n_layers; i++) {
-                layers[i]->setHigh(col, -1);
-                layers[i]->setLow(col, -1);
+            if (cur_color == layer_color) {
+                max_i = i + 1;
             }
- 
         }
-        // Disable unused layers
-        for (uint32_t i = max_mask_layer_idx; i< n_layers; i++) {
-            layers[i]->setEnabled(false);
+
+        if (start_i == max_i - 1) {
+            return;
+        }
+
+        layers[layer_idx]->setColor(col_idx, layer_color);
+        layers[layer_idx]->setLow(col_idx, (float)min_i);
+        layers[layer_idx]->setHigh(col_idx, (float)max_i);
+        layers[layer_idx]->setEnabled(true);
+
+        // printf("Low: %f, High: %f Color: (%d, %d, %d)\n", (float)min_i, (float)max_i, layer_color.r, layer_color.g, layer_color.b);
+
+        process_sublayer_column(column, col_idx, max_i - 1, stop_i, layer_idx + 1);
+    }
+
+    void process_layer_column(const etl::vector<CRGB, n_layers> &column, const uint32_t col_idx) {
+        volatile int32_t min_i = -1;
+        volatile int32_t max_i = -1;
+        CRGB layer_color = {0, 0, 0};
+        bool should_recurse = false;
+        etl::set<CRGB, 32> seen_colors;
+
+        //Serial.printf("Processing column %d (size: %d)\n", col_idx, column.size());
+
+        // Loop over the column and find the min and max non-zero indices
+        // The base layer covers everything with one color
+        for (uint32_t i = 0; i < column.size(); i++) {
+            CRGB cur_color = column.at(i);
+            
+            // Serial.printf("(%d, %d) Cur color: (%d, %d, %d)\n", col_idx, i, cur_color.r, cur_color.g, cur_color.b);
+
+            if (min_i == -1 && cur_color != CRGB {0, 0, 0}) {
+                min_i = i;
+                layer_color = cur_color;
+            }
+
+            if (cur_color != CRGB {0, 0, 0}) {
+                max_i = i + 1;
+            }
+
+        }
+
+        for (uint32_t i = min_i; i < max_i; i++) {
+            CRGB cur_color = column.at(i);
+            seen_colors.insert(cur_color);
+        }
+
+        if (seen_colors.size() > 1) {
+            should_recurse = true;
+        }
+
+        //Serial.printf("min_i: %d, max_i: %d\n", min_i, max_i);
+        
+        // Empty column
+        if (min_i == -1 && max_i == -1) {
+            layers[0]->setColor(col_idx, CRGB {0, 0, 0});
+            layers[0]->setLow(col_idx, -1.0f);
+            layers[0]->setHigh(col_idx, -1.0f);
+            layers[0]->setEnabled(true);
+        } 
+        // Non-empty column
+        else {
+            layers[0]->setColor(col_idx, CRGB{255, 0, 0});
+            layers[0]->setLow(col_idx, (float)min_i);
+            layers[0]->setHigh(col_idx, (float)max_i);
+            layers[0]->setEnabled(true);
+
+            // printf("Low: %f, High: %f Color: (%d, %d, %d)\n", (float)min_i, (float)max_i, layer_color.r, layer_color.g, layer_color.b);
+
+            if (should_recurse) {
+                //Serial.println("RECURSING");
+                process_sublayer_column(column, col_idx, min_i, max_i, 1);
+            }
         }
     }
 
-    // Oh gawd please send help
-    // void updateColors(float deltaFactor) {
-    //     for (uint16_t x = 0; x < current_framebuffer->width(); x++) {
-    //         for (uint16_t y = 0; y < current_framebuffer->height(); y++) {
+public:
+    void recalculateLayerTargets(CRGBCanvas &target) {
+        etl::vector<CRGB, n_layers> column;
+        column.reserve(target.getHeight());
 
-    //             uint16_t cur_color = current_framebuffer->getPixel(x, y);
-    //             uint16_t target_color = target_framebuffer->getPixel(x, y);
+        //Serial.print("NAME: ");        
+        //Serial.println(this->getName().c_str());
 
-    //             CRGB cur;
-    //             convert565toCRGB(cur_color, cur);
-    //             // Serial.printf("Cur r %d, g %d, b %d \n", cur_r, cur_g, cur_b);
+        // Clear layers
+        for (uint32_t i = 0; i< n_layers; i++) {
+            layers[i]->setEnabled(false);
+        }
 
-    //             CRGB target;
-    //             convert565toCRGB(target_color, target);
-    //             // Serial.printf("Target r %d, g %d, b %d \n", target_r, target_g, target_b);
+        
+        for (uint16_t col = 0; col < target.getWidth(); col++) {
+            column.clear();
+            //Serial.print("Column: [");
+            // Get the current column
+            for (uint32_t row = 0; row < target.getHeight(); row++) {
+                column.push_back(target.getPixel(col, row));
+                //Serial.printf("(%d, %d, %d)", column[row].r, column[row].g, column[row].b);
+                //Serial.print(" ");
+            }
+            //Serial.println("]");
 
-    //             int16_t delta_r = target.r - cur.r;
-    //             int16_t delta_g = target.g - cur.g;
-    //             int16_t delta_b = target.b - cur.b;
+            // Process the layers
+            process_layer_column(column, col);
+        }
 
-    //             // Serial.printf("Delta r %d, g %d, b %d \n", delta_r, delta_g, delta_b);
-    //             // uint8_t blendAmount = (uint8_t)(255.0 * deltaFactor);
-    //             // CRGB newColor = blend(cur, target, blendAmount);
+    }
 
-    //             CRGB newColor;
-    //             newColor.r = (uint8_t)((float)cur.r + (float)delta_r * deltaFactor);
-    //             newColor.g = (uint8_t)((float)cur.g + (float)delta_g * deltaFactor);
-    //             newColor.b = (uint8_t)((float)cur.b + (float)delta_b * deltaFactor);
-    //             // Serial.printf("New r %u, g %u, b %u \n", new_r, new_g, new_b);
-    //             // Serial.println("lol");
+    // void recalculateLayerTargets(CRGBCanvas &target) {
+    //     uint32_t max_mask_layer_idx = 0;
 
-    //             current_framebuffer->drawPixel(x, y, convertCRGBto565(newColor));
+    //     for (uint16_t col = 0; col < target.getWidth(); col++) {
+   
+    //         // Volatile as workaround for compiler bug, seems related to
+    //         // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=66358 ?
+    //         volatile int16_t col_first = -1;
+    //         volatile int16_t col_last = -1;
+
+    //         uint32_t mask_layer_idx = 1;
+    //         int32_t mask_first = -1;
+    //         int32_t mask_last = -1;
+
+    //         CRGB last_pixel = 0;
+    //         CRGB cur_pixel = 0;
+    //         CRGB col_color = 0;
+
+    //         for (uint16_t row = 0; row < target.getHeight(); row++) {
+                
+    //             cur_pixel = target.getPixel(col, row);
+    //             // Serial.printf("CUR PIXEL %d %d %d\n", cur_pixel.r, cur_pixel.g, cur_pixel.b);
+    //             if (cur_pixel && col_first == -1) {
+    //                 col_first = row;
+    //             }
+
+    //             if (cur_pixel) {
+    //                 col_last = row;
+    //                 col_color = cur_pixel;
+    //             }
+
+
+    //             if (col_first != -1 && mask_first == -1 && cur_pixel != last_pixel) {
+    //                 mask_first = row;
+    //             }
+    //             if (col_first != -1 && mask_first != -1 && cur_pixel != last_pixel) {
+    //                 mask_last = row;
+    //             }
+        
+
+    //             if (mask_first != -1 && mask_last != -1) {
+    //                 layers[mask_layer_idx]->setColor(col, cur_pixel);
+    //                 layers[mask_layer_idx]->setHigh(col, mask_last);
+    //                 layers[mask_layer_idx]->setLow(col, mask_first);
+
+    //                 mask_first = -1;
+    //                 mask_last = -1;
+    //                 max_mask_layer_idx = max(mask_layer_idx, max_mask_layer_idx);
+    //                 mask_layer_idx++;
+    //             }
+
+    //             last_pixel = cur_pixel;
     //         }
-    //     } 
+    //         // Serial.printf("col color (%d, %d, %d)\n", col_color.r, col_color.g, col_color.b);
+    //         layers[0]->setColor(col, col_color);
+    //         // layers[0]->targetLow[col] = col_first;
+    //         // layers[0]->targetHigh[col] = col_last;
+    //         layers[0]->setHigh(col, col_last);
+    //         layers[0]->setLow(col, col_first);
+
+    //         // Clear remaining layers
+    //         for (uint32_t i = mask_layer_idx; i < n_layers; i++) {
+    //             layers[i]->setHigh(col, -1);
+    //             layers[i]->setLow(col, -1);
+    //         }
+ 
+    //     }
+    //     // Disable unused layers
+    //     for (uint32_t i = max_mask_layer_idx; i< n_layers; i++) {
+    //         layers[i]->setEnabled(false);
+    //     }
     // }
 
     CRGB getPixel(uint16_t x, uint16_t y) const{
-        // CRGB tmp;
-        // uint16_t tmp_565 = current_framebuffer->getPixel(x, y);
-
-        // convert565toCRGB(tmp_565, tmp);
-
-        // // if (tmp_565) {
-        // //     tmp = CRGB(255, 0, 0);
-        // // }
-
-        // Serial.printf("PIXEL(%d, %d) - (%d, %d, %d)\n", x, y, tmp.r, tmp.g, tmp.b);
-        // return tmp;
         return current_framebuffer->getPixel(x, y);
-        //TODO: wtf
-        //return target_framebuffer->getPixel(x, y);
-        // First check if it is masked or not
-        // if (!layers[0]->getPixel(x, y)) {
-        //     return 0;
-        // }
-        // Otherwise return the color
-        // uint16_t col = current_framebuffer->getPixel(x, y);
-        // if (col) {
-        //     return col;
-        // } else {
-        // return layers[0]->getColor(x);
-        // }
     }
 
     uint16_t getWidth() const {return width;}
