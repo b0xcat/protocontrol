@@ -15,6 +15,8 @@
 #include <etl/set.h>
 #include <etl/vector.h>
 
+extern bool debug;
+
 inline int round(float x) {
     return x >=0 ? (int)((x)+0.5) : (int)((x)-0.5);
 };
@@ -32,6 +34,7 @@ private:
     CRGB* targetColors;
     uint16_t width;
     bool enabled;
+    bool* colEnabled;
 
 
     void interpolatecolumn(uint col, float target_high, float target_low, float deltaFactor)
@@ -56,17 +59,50 @@ public:
     , targetColors(new CRGB[width])
     , width(width)
     , enabled(enabled)
+    , colEnabled(new bool[width])
     {
         for (uint32_t i = 0; i < width; i++) {
             curHigh[i] = -1.0;
             curLow[i] = -1.0;
             targetHigh[i] = -1.0;
             targetLow[i] = -1.0;
+            curColors[i] = CRGB {0, 0, 0};
+            targetColors[i] = CRGB {0, 0, 0};
+            colEnabled[i] = false;
         }
     }
 
     void setEnabled(bool b) {
         enabled = b;
+        if (!b) {
+            for (uint32_t i = 0; i < width; i++) {
+                colEnabled[i] = false;
+            }
+        }
+    }
+
+    void enableCol(uint32_t col_idx) {
+        colEnabled[col_idx] = true;
+    }
+
+    bool isColEnabled(uint32_t col_idx) {
+        return colEnabled[col_idx];
+    }
+
+    void clearTargets() {
+        for (uint32_t i = 0; i < width; i++) {
+            targetHigh[i] = -1.0;
+            targetLow[i] = -1.0;
+            targetColors[i] = CRGB {0, 0, 0};
+        }
+    }
+
+    void clearCur() {
+        for (uint32_t i = 0; i < width; i++) {
+            curHigh[i] = -1.0;
+            curLow[i] = -1.0;
+            curColors[i] = CRGB {0, 0, 0};
+        }
     }
 
     bool isEnabled() {
@@ -76,7 +112,6 @@ public:
     void setColor(uint16_t idx, CRGB color) {
         targetColors[idx] = color;
     }
-
     
     void setLow(uint16_t idx, float value) {
         targetLow[idx] = value;
@@ -130,7 +165,7 @@ public:
             // Case 1: Nothing to do:
             if (cur_high == cur_target_high && cur_low == cur_target_low)
             {
-                continue;
+                //continue;
             }
             // Case 2: appear from nothingness:
             else if (cur_high < 0 && cur_low < 0 && cur_target_high >= 0 && cur_target_low >= 0)
@@ -162,12 +197,14 @@ public:
             }
 
             // Update colors
-            // CRGB cur;
-            // CRGB target;
-            // convert565toCRGB(curColors[col], cur);
-            // convert565toCRGB(targetColors[col], cur);
 
-            curColors[col] = targetColors[col];
+            // Blending still glitches out sometimes :(
+            CRGB cur = curColors[col];
+            CRGB target = targetColors[col];
+            CRGB new_color = blend(cur, target, 32);
+            curColors[col] = new_color;
+
+            // curColors[col] = targetColors[col];
         }
     }
 };
@@ -218,13 +255,22 @@ public:
     }
 
     void renderToFramebuffer() {
-        //Serial.printf("Rendering %s to framebuffer\n", this->getName().c_str());
+
+        // if (debug) {
+        //     Serial.printf("Rendering %s to framebuffer\n", this->getName().c_str());    
+        // }
+
         current_framebuffer->clear();
         uint layerno = 0;
         for (auto &layer: layers) {
             if (layer->isEnabled()) {
 
                 for (uint32_t col = 0; col < width; col++) {
+                    
+                    if (!layer->isColEnabled(col)) {
+                        continue;
+                    }
+
                     float _low = layer->getLow(col);
                     float _high = layer->getHigh(col);
                     
@@ -232,7 +278,9 @@ public:
                         continue;
                     }
 
-                    // Serial.printf("layerno: %d, lowf: %f, highf: %f \n", layerno, _low, _high);
+                    // if (debug) {
+                    //     Serial.printf("layerno: %d, col: %d, lowf: %f, highf: %f \n", layerno, col, _low, _high);
+                    // }
 
                     int low = layer->getLow(col) + 0.5f;
                     int high = layer->getHigh(col) - 0.5f;
@@ -292,8 +340,11 @@ private:
         layers[layer_idx]->setLow(col_idx, (float)min_i);
         layers[layer_idx]->setHigh(col_idx, (float)max_i);
         layers[layer_idx]->setEnabled(true);
+        layers[layer_idx]->enableCol(col_idx);
 
-        // printf("Low: %f, High: %f Color: (%d, %d, %d)\n", (float)min_i, (float)max_i, layer_color.r, layer_color.g, layer_color.b);
+        if (debug) {
+            printf("Low: %f, High: %f Color: (%d, %d, %d)\n", (float)min_i, (float)max_i, layer_color.r, layer_color.g, layer_color.b);
+        }
 
         process_sublayer_column(column, col_idx, max_i - 1, stop_i, layer_idx + 1);
     }
@@ -312,7 +363,9 @@ private:
         for (uint32_t i = 0; i < column.size(); i++) {
             CRGB cur_color = column.at(i);
             
-            // Serial.printf("(%d, %d) Cur color: (%d, %d, %d)\n", col_idx, i, cur_color.r, cur_color.g, cur_color.b);
+            if (debug) {
+                Serial.printf("(%d, %d) Cur color: (%d, %d, %d)\n", col_idx, i, cur_color.r, cur_color.g, cur_color.b);
+            }
 
             if (min_i == -1 && cur_color != CRGB {0, 0, 0}) {
                 min_i = i;
@@ -342,18 +395,20 @@ private:
             layers[0]->setLow(col_idx, -1.0f);
             layers[0]->setHigh(col_idx, -1.0f);
             layers[0]->setEnabled(true);
+            layers[0]->enableCol(col_idx);
         } 
         // Non-empty column
         else {
-            layers[0]->setColor(col_idx, CRGB{255, 0, 0});
+            layers[0]->setColor(col_idx, layer_color);// CRGB{255, 0, 0});
             layers[0]->setLow(col_idx, (float)min_i);
             layers[0]->setHigh(col_idx, (float)max_i);
             layers[0]->setEnabled(true);
+            layers[0]->enableCol(col_idx);
 
             // printf("Low: %f, High: %f Color: (%d, %d, %d)\n", (float)min_i, (float)max_i, layer_color.r, layer_color.g, layer_color.b);
 
             if (should_recurse) {
-                //Serial.println("RECURSING");
+                Serial.println("RECURSING");
                 process_sublayer_column(column, col_idx, min_i, max_i, 1);
             }
         }
@@ -364,8 +419,12 @@ public:
         etl::vector<CRGB, n_layers> column;
         column.reserve(target.getHeight());
 
-        //Serial.print("NAME: ");        
-        //Serial.println(this->getName().c_str());
+        if (debug) {
+            Serial.print("NAME: ");        
+            Serial.println(this->getName().c_str());
+            target.print();
+        }
+        
 
         // Clear layers
         for (uint32_t i = 0; i< n_layers; i++) {
@@ -374,7 +433,9 @@ public:
 
         
         for (uint16_t col = 0; col < target.getWidth(); col++) {
+            // column.fill(CRGB{0,0,0});
             column.clear();
+            
             //Serial.print("Column: [");
             // Get the current column
             for (uint32_t row = 0; row < target.getHeight(); row++) {

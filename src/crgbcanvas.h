@@ -45,6 +45,19 @@ public:
         return height;
     }
 
+    void print() {
+        for (uint32_t row = 0; row < height; row++) {
+            for (uint32_t col = 0; col < width; col++) {
+                if (getPixel(col, row) == CRGB{0,0,0}) {
+                    Serial.print("o ");
+                } else {
+                    Serial.print("x ");
+                }
+            }
+            Serial.println();
+        }
+    }
+
 };
 
 #endif

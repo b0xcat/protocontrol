@@ -3,7 +3,8 @@ from PIL import Image
 
 
 def RGBto565(r, g, b):
-    return bytes.fromhex("%0.4X" % ((int(b / 255 * 31) << 11) | (int(r / 255 * 63) << 5) | (int(g / 255 * 31))))
+    # return bytes.fromhex("%0.4X" % ((int(b / 255 * 31) << 11) | (int(r / 255 * 63) << 5) | (int(g / 255 * 31))))
+    return bytes.fromhex(f"{(((r & 0b11111000)<<8) + ((g & 0b11111100)<<3)+(b>>3)):04x}")
 
 
 if __name__ == "__main__":
@@ -12,7 +13,7 @@ if __name__ == "__main__":
     out_dir.mkdir(exist_ok=True)
 
     # Loop over all files in input directory
-    for path in [x for x in Path("in").glob("*") if x.is_file()]:
+    for path in [x for x in Path("in").glob("*.png") if x.is_file()]:
         print(f"Converting {path}")
 
         try:

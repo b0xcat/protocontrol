@@ -5,6 +5,8 @@
 #include "colorconversion.h"
 #include <FastLED.h>
 
+extern bool rainbowEnabled;
+
 // Man, wish I could use concepts rn
 // T should be an IPixelReadable I guess?
 template <typename T> 
@@ -30,9 +32,12 @@ public:
     {}
 
     CRGB getPixel(uint16_t x, uint16_t y) const override {
-        uint16_t cur_color = T::getPixel(x, y);
+        CRGB cur_color = T::getPixel(x, y);
+        if (!rainbowEnabled) {
+            return cur_color;
+        }
 
-        if (cur_color == 0) {
+        if (cur_color == CRGB{0, 0, 0}) {
             return cur_color;
         }
 

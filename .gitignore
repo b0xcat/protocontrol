@@ -33,3 +33,6 @@
 
 .pio/
 .vscode/
+
+util/imageconverter/og
+util/imageconverter/venv

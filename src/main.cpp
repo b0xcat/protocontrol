@@ -44,6 +44,12 @@
 
 #include "crgbcanvas.h"
 
+#include "remotereceiver.h"
+
+// Debug enable
+bool debug = false;
+bool rainbowEnabled = false;
+
 // For synchronization of update and drawing loop
 SemaphoreHandle_t xBinarySemaphore;
 
@@ -53,20 +59,33 @@ TaskHandle_t UpdateTask;
 // Define the layout of our physical display
 FastLEDDisplay display {
     new FastLEDString{
-        new WS2812<16, GRB>, {
+        new WS2812<16, RGB>, {
             new FastLEDMatrix{16, 8, 0, 0, 0},
             new FastLEDMatrix{32, 8, 0, 16, 0},
             new FastLEDMatrix{8, 8, 32, 8, 0},
         }},
     new FastLEDString{
-        new WS2812<17, GRB>, {
+        new WS2812<17, RGB>, {
             new FastLEDMatrix{16, 8, 64, 0, 2},
             new FastLEDMatrix{32, 8, 48, 16, 2},
             new FastLEDMatrix{8, 8, 40, 8, 2},
-        }}
+        }},
+    new FastLEDString{
+        new WS2812<21,RGB>, {
+            new FastLEDMatrix{8, 8, 24, 8, 0}
+        }
+    },
+    new FastLEDString{
+        new WS2812<22,RGB>, {
+            new FastLEDMatrix{8, 8, 56, 8, 0}
+        }
+    }
 };
 
 #define NUM_LEDS_SIDEPANEL 15 + 8 + 16 + 12
+// WS2812<21, GRB> sidePanelLeft;
+// WS2812<22, GRB> sidePanelRight;
+// CRGB sidePanelFramebuffer[NUM_LEDS_SIDEPANEL];
 
 ProtoControl::BitmapManager<256> bitmapManager;
 
@@ -94,10 +113,12 @@ Scene scene{
     }},
     new Rainbow<TargetFollowerElement> {"mouth_r_follower", 32, 8, 48, 16, {
         new BitmapElement{"mouth_r"},
-    }}
+    }},
+
+    new Rainbow<BitmapElement>{"ear_r", 24, 8},
+    new Rainbow<BitmapElement>{"ear_l", 56, 8}
     
 };
-
 
 volatile bool flipped = false;
 CRGBCanvas* framebuffer[] {
@@ -112,8 +133,10 @@ ElementDrawer drawer[] {
 };
 
 // // Used to set bitmaps in the scene
-ElementRGBBitmapSetter bmpsetter;
-ElementRGBBitmapSetter eyesclosedsetter;
+ElementRGBBitmapSetter normalfacesetter;
+ElementRGBBitmapSetter angryfacesetter;
+ElementRGBBitmapSetter nwnfacesetter;
+ElementRGBBitmapSetter heartfacesetter;
 
 // // Used to print a text representation of the scene
 // ElementPrinter ep(Serial);
@@ -158,7 +181,7 @@ void updateLoop(void * params) {
         after = micros();
         delta = after - before;
 
-        Serial.printf("Updating took %d us\n", delta);
+        // Serial.printf("Updating took %d us\n", delta);
 
     }
 }
@@ -191,7 +214,7 @@ void drawLoop(void * params) {
 
         end = micros();
 
-        Serial.printf("drawloop took %d us\n", end - begin);
+        // Serial.printf("drawloop took %d us\n", end - begin);
 
         
     }
@@ -201,6 +224,14 @@ void setup()
 {
   esp_log_level_set("*", ESP_LOG_VERBOSE);
   Serial.begin(115200);
+
+  // Print mac address
+  Serial.print("ESP Board MAC Address:  ");
+  Serial.println(WiFi.macAddress());
+
+  // Set up esp now remote
+  WiFi.mode(WIFI_STA);
+  RemoteReceiver::init();
 
   // Set up littleFS
   if (!LITTLEFS.begin(true))
@@ -216,7 +247,8 @@ void setup()
 
   // ep.visit(&scene);
 
-  bmpsetter
+  // Define expressions
+  normalfacesetter
       .add("eye_r", bitmapManager.get("/565/proto_eye"))
       .add("eye_l", bitmapManager.get("/565/proto_eye"))
       .add("nose_r", bitmapManager.get("/565/proto_nose"))
@@ -226,12 +258,68 @@ void setup()
       .add("ear_l", bitmapManager.get("/565/proto_ear"))
       .add("ear_r", bitmapManager.get("/565/proto_ear"))
       .visit(&scene);
+    
+  angryfacesetter
+      .add("eye_r", bitmapManager.get("/565/proto_eye_angry"))
+      .add("eye_l", bitmapManager.get("/565/proto_eye_angry"))
+      .add("nose_r", bitmapManager.get("/565/proto_nose_angry"))
+      .add("nose_l", bitmapManager.get("/565/proto_nose_angry"))
+      .add("mouth_r", bitmapManager.get("/565/proto_mouth_angry"))
+      .add("mouth_l", bitmapManager.get("/565/proto_mouth_angry"))
+      .add("ear_l", bitmapManager.get("/565/proto_ear"))
+      .add("ear_r", bitmapManager.get("/565/proto_ear"));
+      
+  nwnfacesetter
+      .add("eye_r", bitmapManager.get("/565/proto_eye_n"))
+      .add("eye_l", bitmapManager.get("/565/proto_eye_n"))
+      .add("nose_r", bitmapManager.get("/565/proto_nose"))
+      .add("nose_l", bitmapManager.get("/565/proto_nose"))
+      .add("mouth_r", bitmapManager.get("/565/proto_mouth_w"))
+      .add("mouth_l", bitmapManager.get("/565/proto_mouth_w"))
+      .add("ear_l", bitmapManager.get("/565/proto_ear"))
+      .add("ear_r", bitmapManager.get("/565/proto_ear"));
 
-  eyesclosedsetter
-      .add("eye_r", bitmapManager.get("/565/proto_eye_closed"))
-      .add("eye_l", bitmapManager.get("/565/proto_eye_closed"));
+  heartfacesetter
+      .add("eye_r", bitmapManager.get("/565/proto_eye_heart_blue"))
+      .add("eye_l", bitmapManager.get("/565/proto_eye_heart_blue"))
+      .add("nose_r", bitmapManager.get("/565/proto_rgb_test"))
+      .add("nose_l", bitmapManager.get("/565/proto_rgb_test"));
+      // .add("mouth_r", bitmapManager.get("/565/proto_mouth"))
+      // .add("mouth_l", bitmapManager.get("/565/proto_mouth"))
+      // .add("ear_l", bitmapManager.get("/565/proto_ear"))
+      // .add("ear_r", bitmapManager.get("/565/proto_ear"));
 
-  display.setBrightness(32);
+  // Setup button event handler
+  auto buttonHandler = [](int button) {
+    switch (button) {
+      case 3:
+        nwnfacesetter.visit(&scene);
+        break;
+      case 5:
+        angryfacesetter.visit(&scene);
+        break;
+      case 7: 
+        normalfacesetter.visit(&scene);
+        break;
+      case 9:
+        rainbowEnabled = !rainbowEnabled;
+        // heartfacesetter.visit(&scene);
+        // debug = !debug;
+
+        break;
+    }
+  };
+  etl::delegate<void(int)> buttonHandlerDelegate(buttonHandler);
+  RemoteReceiver::setButtonHandler(buttonHandlerDelegate);
+  
+
+  display.setBrightness(64);
+
+//   FastLED.addLeds((CLEDController*)&sidePanelLeft, (CRGB*)&sidePanelFramebuffer, NUM_LEDS_SIDEPANEL);
+//   FastLED.addLeds((CLEDController*)&sidePanelRight, (CRGB*)&sidePanelFramebuffer, NUM_LEDS_SIDEPANEL);
+
+//   fill_solid((CRGB*)&sidePanelFramebuffer, NUM_LEDS_SIDEPANEL, CRGB {255, 0, 0});
+//   FastLED.show();
 
   xBinarySemaphore = xSemaphoreCreateBinary();
 
@@ -261,5 +349,5 @@ unsigned long prev = 0;
 void loop()
 {
   Serial.printf("Free heap: %d\n", ESP.getFreeHeap());
-  delay(1000);
+  delay(5000);
 }
