@@ -8,7 +8,7 @@
 
 typedef struct __attribute__((packed)) {
     uint32_t button_number;
-    bool button_pushed;
+    bool left_side;
 } esp_now_msg;
 
 
@@ -21,6 +21,8 @@ private:
     static void onDataRecv (const uint8_t * mac, const uint8_t *incomingData, int len) {
         memcpy(&myMsg, incomingData, sizeof(myMsg));
 
+        uint8_t buttonPressed = myMsg.button_number + myMsg.left_side;
+
         // Serial.print("Bytes received: ");
         // Serial.println(len);
 
@@ -28,18 +30,19 @@ private:
             return;
         }
 
-        if (myMsg.button_number == lastButtonPressed) {
+        if (buttonPressed == lastButtonPressed) {
             return;
         }
 
-        lastButtonPressed = myMsg.button_number;
-
         Serial.print("Button number: ");
-        Serial.println(myMsg.button_number);
+        Serial.print(myMsg.button_number);
+        Serial.print(" Left side: ");
+        Serial.print(myMsg.left_side);
         Serial.println();
 
+        lastButtonPressed = buttonPressed;
         // Call the delegate function if it is valid
-        buttonEventHandler.call_if(lastButtonPressed);
+        buttonEventHandler.call_if(buttonPressed);
 
     }
 

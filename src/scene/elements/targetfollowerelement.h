@@ -201,7 +201,7 @@ public:
             // Blending still glitches out sometimes :(
             CRGB cur = curColors[col];
             CRGB target = targetColors[col];
-            CRGB new_color = blend(cur, target, 32);
+            CRGB new_color = blend(cur, target, 16);
             curColors[col] = new_color;
 
             // curColors[col] = targetColors[col];
@@ -408,7 +408,7 @@ private:
             // printf("Low: %f, High: %f Color: (%d, %d, %d)\n", (float)min_i, (float)max_i, layer_color.r, layer_color.g, layer_color.b);
 
             if (should_recurse) {
-                Serial.println("RECURSING");
+                // Serial.println("RECURSING");
                 process_sublayer_column(column, col_idx, min_i, max_i, 1);
             }
         }

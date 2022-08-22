@@ -36,6 +36,7 @@
 #include "scene/modifiers/mirror.h"
 #include "scene/modifiers/rainbow.h"
 #include "scene/modifiers/blink.h"
+#include "scene/modifiers/coloroverride.h"
 
 #include "bitmaps.h"
 #include "displays/fastled/fastleddisplay.h"
@@ -49,6 +50,7 @@
 // Debug enable
 bool debug = false;
 bool rainbowEnabled = false;
+CRGB overrideColor {0, 255, 0};
 
 // For synchronization of update and drawing loop
 SemaphoreHandle_t xBinarySemaphore;
@@ -71,12 +73,12 @@ FastLEDDisplay display {
             new FastLEDMatrix{8, 8, 40, 8, 2},
         }},
     new FastLEDString{
-        new WS2812<21,RGB>, {
+        new WS2812B<21,RGB>, {
             new FastLEDMatrix{8, 8, 24, 8, 0}
         }
     },
     new FastLEDString{
-        new WS2812<22,RGB>, {
+        new WS2812B<22,RGB>, {
             new FastLEDMatrix{8, 8, 56, 8, 0}
         }
     }
@@ -115,8 +117,8 @@ Scene scene{
         new BitmapElement{"mouth_r"},
     }},
 
-    new Rainbow<BitmapElement>{"ear_r", 24, 8},
-    new Rainbow<BitmapElement>{"ear_l", 56, 8}
+    new Rainbow<ColorOverride<BitmapElement>>{"ear_r", 24, 8},
+    new Rainbow<ColorOverride<BitmapElement>>{"ear_l", 56, 8}
     
 };
 
@@ -136,7 +138,10 @@ ElementDrawer drawer[] {
 ElementRGBBitmapSetter normalfacesetter;
 ElementRGBBitmapSetter angryfacesetter;
 ElementRGBBitmapSetter nwnfacesetter;
+ElementRGBBitmapSetter uwufacesetter;
+ElementRGBBitmapSetter owofacesetter;
 ElementRGBBitmapSetter heartfacesetter;
+ElementRGBBitmapSetter arrowfacesetter;
 
 // // Used to print a text representation of the scene
 // ElementPrinter ep(Serial);
@@ -279,33 +284,74 @@ void setup()
       .add("ear_l", bitmapManager.get("/565/proto_ear"))
       .add("ear_r", bitmapManager.get("/565/proto_ear"));
 
+  uwufacesetter
+      .add("eye_r", bitmapManager.get("/565/proto_eye_u"))
+      .add("eye_l", bitmapManager.get("/565/proto_eye_u"))
+      .add("nose_r", bitmapManager.get("/565/proto_nose"))
+      .add("nose_l", bitmapManager.get("/565/proto_nose"))
+      .add("mouth_r", bitmapManager.get("/565/proto_mouth_w"))
+      .add("mouth_l", bitmapManager.get("/565/proto_mouth_w"))
+      .add("ear_l", bitmapManager.get("/565/proto_ear"))
+      .add("ear_r", bitmapManager.get("/565/proto_ear"));
+
+  owofacesetter
+      .add("eye_r", bitmapManager.get("/565/proto_eye_o"))
+      .add("eye_l", bitmapManager.get("/565/proto_eye_o"))
+      .add("nose_r", bitmapManager.get("/565/proto_nose"))
+      .add("nose_l", bitmapManager.get("/565/proto_nose"))
+      .add("mouth_r", bitmapManager.get("/565/proto_mouth_w"))
+      .add("mouth_l", bitmapManager.get("/565/proto_mouth_w"))
+      .add("ear_l", bitmapManager.get("/565/proto_ear"))
+      .add("ear_r", bitmapManager.get("/565/proto_ear"));
+
   heartfacesetter
-      .add("eye_r", bitmapManager.get("/565/proto_eye_heart_blue"))
-      .add("eye_l", bitmapManager.get("/565/proto_eye_heart_blue"))
-      .add("nose_r", bitmapManager.get("/565/proto_rgb_test"))
-      .add("nose_l", bitmapManager.get("/565/proto_rgb_test"));
-      // .add("mouth_r", bitmapManager.get("/565/proto_mouth"))
-      // .add("mouth_l", bitmapManager.get("/565/proto_mouth"))
-      // .add("ear_l", bitmapManager.get("/565/proto_ear"))
-      // .add("ear_r", bitmapManager.get("/565/proto_ear"));
+      .add("eye_r", bitmapManager.get("/565/proto_eye_heart"))
+      .add("eye_l", bitmapManager.get("/565/proto_eye_heart"))
+      .add("nose_r", bitmapManager.get("/565/proto_nose"))
+      .add("nose_l", bitmapManager.get("/565/proto_nose"))
+      .add("mouth_r", bitmapManager.get("/565/proto_mouth"))
+      .add("mouth_l", bitmapManager.get("/565/proto_mouth"))
+      .add("ear_l", bitmapManager.get("/565/proto_ear"))
+      .add("ear_r", bitmapManager.get("/565/proto_ear"));
+
+  arrowfacesetter
+      .add("eye_r", bitmapManager.get("/565/proto_eye_arrow"))
+      .add("eye_l", bitmapManager.get("/565/proto_eye_arrow"))
+      .add("nose_r", bitmapManager.get("/565/proto_nose"))
+      .add("nose_l", bitmapManager.get("/565/proto_nose"))
+      .add("mouth_r", bitmapManager.get("/565/proto_mouth_angry"))
+      .add("mouth_l", bitmapManager.get("/565/proto_mouth_angry"))
+      .add("ear_l", bitmapManager.get("/565/proto_ear"))
+      .add("ear_r", bitmapManager.get("/565/proto_ear"));
 
   // Setup button event handler
   auto buttonHandler = [](int button) {
+    Serial.print("Received button: ");
+    Serial.println(button);
     switch (button) {
       case 3:
-        nwnfacesetter.visit(&scene);
+        heartfacesetter.visit(&scene);
+        break;
+      case 4:
+        uwufacesetter.visit(&scene);
         break;
       case 5:
         angryfacesetter.visit(&scene);
         break;
-      case 7: 
+      case 6:
+        owofacesetter.visit(&scene);
+        break;
+      case 7:
+        nwnfacesetter.visit(&scene);
+        break;
+      case 8:
+        arrowfacesetter.visit(&scene);
+        break;
+      case 9: 
         normalfacesetter.visit(&scene);
         break;
-      case 9:
+      case 10:
         rainbowEnabled = !rainbowEnabled;
-        // heartfacesetter.visit(&scene);
-        // debug = !debug;
-
         break;
     }
   };
