@@ -1,81 +1,59 @@
-// #ifndef __Max7219_display_H__
-// #define __Max7219_display_H__
+#ifndef __Max7219_display_H__
+#define __Max7219_display_H__
 
-// #include <Adafruit_GFX.h>
-// #include <initializer_list>
+#include <initializer_list>
+#include "ipixel.h"
+#include <Adafruit_GFX.h>
+#include "Max72xxPanel.h"
 
-// static const uint32_t max_matrix_strings = 2;
+static const uint32_t max_matrix_strings = 2;
 
-// class Max7219display : public Adafruit_GFX {
+class Max7219display : public IPixelReadWriteable
+{
 
-// public:
-//     /**
-//      * Do not allow default constructor
-//      */
-//     Max7219display() = delete;
+private:
+    Max72xxPanel &panel;
 
-//     /**
-//      * Construct a WS2812Display with an initializer list of WS2812String objects
-//      * 
-//      * The display width of the WS2812Display will be equal to the sum of the width of the
-//      * matrix objects in the strings
-//      * 
-//      * The display height will be equal to the max height of the matrices.
-//      * 
-//      * So essentially this will represent a bounding rectangle around the input matrices
-//      * laid out in one long row
-//      */
-//     Max7219display (std::initializer_list<WS2812String*> strings): Adafruit_GFX {
-//         std::accumulate(strings.begin(), strings.end(),
-//                         (int16_t)0, [](int16_t a, const WS2812String* mat) {
-//                             return a + mat->width();
-//                         }),
-//         std::accumulate(strings.begin(), strings.end(),
-//                         (int16_t)0, [](int16_t a, const WS2812String* mat) {
-//                             return std::max(a, mat->height());
-//                         }),
-//     } {
-    
-//     }
+public:
+    /**
+     * Do not allow default constructor
+     */
+    Max7219display() = delete;
 
-//     void drawPixel(int16_t x, int16_t y, uint16_t color) {
-//         int32_t stringidx = lookupStringIndex(x);
-        
-//         if (stringidx < 0) {
-//             return;
-//         }
+    Max7219display(Max72xxPanel &panel) : panel{panel} {}
 
-//         uint prev_boundary = 0;
-//         if (stringidx > 0 ){
-//             prev_boundary = string_boundaries[stringidx - 1];
-//         } 
+    void setPixel(uint16_t x, uint16_t y, CRGB color) override
+    {   
+        panel.drawPixel(x, y, color ? 1 : 0);
+    }
 
-//         matrix_strings[stringidx]->drawPixel(x - prev_boundary, y, color);
-//     }
+    CRGB getPixel(uint16_t x, uint16_t y) const override
+    {
+        return CRGB(0, 0, 0);
+    }
 
-//     void show() {
-//         // FastLED.setBrightness(16);
-//         unsigned long before = micros();
-//         for (auto &matrixString: matrix_strings) {
-//             matrixString->show(brightness);
-//         }
-//         // FastLED.show();
-//         unsigned long after = micros();
-//         Serial.print("FASTLED TOOK: ");
-//         Serial.print(after - before);
-//         Serial.println(" us");
-//     }
+    Max72xxPanel &getPanel()
+    {
+        return panel;
+    }
 
-//     void setBrightness(uint8_t scale) {
-//         brightness = scale;
-//     }
+    void show()
+    {
+        this->panel.write();
+    }
 
-//     void clear() {
-//         for (auto &matrixString: matrix_strings) {
-//             matrixString->fillScreen(0);
-//         }
-//     }
+    void setBrightness(uint8_t scale)
+    {
+        this->panel.setIntensity(max(0, min(scale >> 4, 15)));
+    }
 
-// };
+    void clear() override
+    {
+        this->panel.fillScreen(0);
+    }
 
-// #endif
+    uint16_t getWidth() const override { return 0; }
+    uint16_t getHeight() const override { return 0; }
+};
+
+#endif
