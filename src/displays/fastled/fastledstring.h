@@ -107,7 +107,7 @@ public:
             }
             controller->setLeds(pixels.get(), num_pixels);
         }
-        swapped != swapped;
+        swapped = !swapped;
     }
 
 

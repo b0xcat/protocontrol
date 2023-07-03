@@ -28,7 +28,7 @@ void ElementRGBBitmapSetter::visit(AdafruitGFXElement* el) {
 
         for (uint16_t x = 0; x < el->width(); x++) {
             for (uint16_t y = 0; y < el->height(); y++) {
-                el->drawPixel(x, y, crgbToRGB565(cur_bitmap->getPixel(x, y)));
+                el->drawPixel(x, y, convertCRGBto565(cur_bitmap->getPixel(x, y)));
             }
         }
     }

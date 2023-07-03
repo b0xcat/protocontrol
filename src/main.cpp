@@ -8,7 +8,6 @@
 #include <stdint.h>
 
 // #define FASTLED_ESP32_I2S
-
 #include <FastLED.h>
 // #include "AsyncJson.h"
 // #include "ArduinoJson.h"
