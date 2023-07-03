@@ -8,10 +8,7 @@
 #include "scene/scene.h"
 #include "bitmaps.h"
 
-
-inline uint16_t crgbToRGB565(CRGB color) {
-  return ((color.r & 0xF8) << 8) | ((color.g & 0xFC) << 3) | ((color.b & 0xF8) >> 3);
-}
+#include "colorconversion.h"
 
 
 void ElementRGBBitmapSetter::follow_children(Element* el) {
