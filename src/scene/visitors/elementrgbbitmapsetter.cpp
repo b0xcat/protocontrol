@@ -8,6 +8,8 @@
 #include "scene/scene.h"
 #include "bitmaps.h"
 
+#include "colorconversion.h"
+
 
 void ElementRGBBitmapSetter::follow_children(Element* el) {
     for (Element* child: el->getChildren()) {
@@ -26,7 +28,7 @@ void ElementRGBBitmapSetter::visit(AdafruitGFXElement* el) {
 
         for (uint16_t x = 0; x < el->width(); x++) {
             for (uint16_t y = 0; y < el->height(); y++) {
-                el->drawPixel(x, y, cur_bitmap->getPixel(x, y));
+                el->drawPixel(x, y, convertCRGBto565(cur_bitmap->getPixel(x, y)));
             }
         }
     }

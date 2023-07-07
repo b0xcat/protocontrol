@@ -40,12 +40,12 @@ public:
 
     void show() {
         // FastLED.setBrightness(16);
-        unsigned long before = micros();
+        // unsigned long before = micros();
         for (auto &matrixString: _strings) {
             matrixString->show();
         }
         // FastLED.show();
-        unsigned long after = micros();
+        // unsigned long after = micros();
         // Serial.print("FASTLED TOOK: ");
         // Serial.print(after - before);
         // Serial.println(" us");

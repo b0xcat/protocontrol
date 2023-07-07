@@ -43,7 +43,7 @@ inline constexpr uint16_t fromRGB( uint8_t r, uint8_t g, uint8_t b) {
   return ( ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3) );
 }
 
-inline uint16_t convertCRGBto565(CRGB& in) {
+inline uint16_t convertCRGBto565(CRGB in) {
   return fromRGB(in.r, in.g, in.b);
 }
 

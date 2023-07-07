@@ -8,7 +8,6 @@
 #include <stdint.h>
 
 // #define FASTLED_ESP32_I2S
-
 #include <FastLED.h>
 // #include "AsyncJson.h"
 // #include "ArduinoJson.h"
@@ -170,7 +169,7 @@ void updateLoop(void *params)
     // For benchmarking
     unsigned long before;
     unsigned long after;
-    unsigned long delta;
+    __attribute__((unused)) unsigned long delta;
 
     while (true)
     {
@@ -208,8 +207,8 @@ void updateLoop(void *params)
 
 void drawLoop(void *params)
 {
-    unsigned long begin = 0;
-    unsigned long end = 0;
+    __attribute__((unused)) unsigned long begin = 0;
+    __attribute__((unused)) unsigned long end = 0;
     while (true)
     {
         begin = micros();
