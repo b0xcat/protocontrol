@@ -1,33 +1,18 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <WiFi.h>
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
-#include <FS.h>
-#include <LITTLEFS.h>
+#include <LittleFS.h>
 #include <stdint.h>
-
-// #define FASTLED_ESP32_I2S
 #include <FastLED.h>
-// #include "AsyncJson.h"
-// #include "ArduinoJson.h"
-// #include "wifi_credentials.h"
-#include "facestorage.h"
-// #include "webserver.h"
 #include "matrix.h"
 #include "matrixmanager.h"
-// #include "max7219painter.h"
-
-// #include "displays/ws2812/ws2812display.h"
-// #include "displays/ws2812/ws2812matrix.h"
-// #include "displays/ws2812/ws2812string.h"
 
 #include "scene/scene.h"
 #include "scene/elements/bitmapelement.h"
-// #include "scene/elements/adagfxelement.h"
+#include "scene/elements/adagfxelement.h"
 #include "scene/elements/targetfollowerelement.h"
 
-// #include "scene/visitors/elementprinter.h"
+#include "scene/visitors/elementprinter.h"
 #include "scene/visitors/elementrgbbitmapsetter.h"
 #include "scene/visitors/elementdrawer.h"
 #include "scene/visitors/elementupdater.h"
@@ -41,7 +26,7 @@
 #include "displays/fastled/fastleddisplay.h"
 #include "displays/fastled/fastledstring.h"
 #include "displays/fastled/fastledmatrix.h"
-#include "displays/max7219/max7219display.h"
+
 
 #include "crgbcanvas.h"
 
@@ -58,32 +43,36 @@ SemaphoreHandle_t xBinarySemaphore;
 TaskHandle_t DrawingTask;
 TaskHandle_t UpdateTask;
 
+#ifdef USE_WS2812Matrix
 // Define the layout of our physical display
-// FastLEDDisplay display {
-//     new FastLEDString{
-//         new WS2812<16, RGB>, {
-//             new FastLEDMatrix{16, 8, 0, 0, 0},
-//             new FastLEDMatrix{32, 8, 0, 16, 0},
-//             new FastLEDMatrix{8, 8, 32, 8, 0},
-//         }},
-//     new FastLEDString{
-//         new WS2812<17, RGB>, {
-//             new FastLEDMatrix{16, 8, 64, 0, 2},
-//             new FastLEDMatrix{32, 8, 48, 16, 2},
-//             new FastLEDMatrix{8, 8, 40, 8, 2},
-//         }},
-//     new FastLEDString{
-//         new WS2812B<21,RGB>, {
-//             new FastLEDMatrix{8, 8, 24, 8, 0}
-//         }
-//     },
-//     new FastLEDString{
-//         new WS2812B<22,RGB>, {
-//             new FastLEDMatrix{8, 8, 56, 8, 0}
-//         }
-//     }
-// };
+FastLEDDisplay display {
+    new FastLEDString{
+        new WS2812<16, RGB>, {
+            new FastLEDMatrix{16, 8, 0, 0, 0},
+            new FastLEDMatrix{32, 8, 0, 16, 0},
+            new FastLEDMatrix{8, 8, 32, 8, 0},
+        }},
+    new FastLEDString{
+        new WS2812<17, RGB>, {
+            new FastLEDMatrix{16, 8, 64, 0, 2},
+            new FastLEDMatrix{32, 8, 48, 16, 2},
+            new FastLEDMatrix{8, 8, 40, 8, 2},
+        }},
+    new FastLEDString{
+        new WS2812B<21,RGB>, {
+            new FastLEDMatrix{8, 8, 24, 8, 0}
+        }
+    },
+    new FastLEDString{
+        new WS2812B<22,RGB>, {
+            new FastLEDMatrix{8, 8, 56, 8, 0}
+        }
+    }
+};
+#endif //USE_WS2812Matrix
 
+#ifdef USE_MAX7219
+#include "displays/max7219/max7219display.h"
 #define CS_PIN 19
 #define CLK_PIN 18
 #define MISO_PIN 2 // we do not use this pin just fill to match constructor
@@ -106,6 +95,9 @@ Max7219display display{panel};
 // WS2812<21, GRB> sidePanelLeft;
 // WS2812<22, GRB> sidePanelRight;
 // CRGB sidePanelFramebuffer[NUM_LEDS_SIDEPANEL];
+
+#endif //USE_MAX7219
+
 
 ProtoControl::BitmapManager<256> bitmapManager;
 
@@ -255,7 +247,7 @@ void setup()
     RemoteReceiver::init();
 
     // Set up littleFS
-    if (!LITTLEFS.begin(true))
+    if (!LittleFS.begin(true))
     {
         Serial.println("LittleFS Mount Failed");
         while (true)
@@ -264,7 +256,7 @@ void setup()
     }
 
     // Collect and load the bitmaps in the LITTLEFS /565 folder
-    bitmapManager.gather(LITTLEFS, "/565");
+    bitmapManager.gather(LittleFS, "/565");
 
     // ep.visit(&scene);
 
@@ -424,7 +416,7 @@ void setup()
         NULL,        /* parameter of the task */
         1,           /* priority of the task */
         &UpdateTask, /* Task handle to keep track of created task */
-        0);          /* pin task to core 1 */
+        0);          /* pin task to core 0 */
 
     xTaskCreatePinnedToCore(
         drawLoop,     /* Task function. */

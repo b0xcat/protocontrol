@@ -17,10 +17,6 @@
 
 extern bool debug;
 
-inline int round(float x) {
-    return x >=0 ? (int)((x)+0.5) : (int)((x)-0.5);
-};
-
 static const float delta_e = 0.1;
 class TargetFollowerLayer {
 public:

@@ -4,10 +4,8 @@
 #include <etl/vector.h>
 #include <FastLED.h>
 #include <initializer_list>
-#include <Vector.h>
 
 #include "displays/fastled/fastledstring.h"
-
 #include "ipixel.h"
 
 
@@ -105,18 +103,6 @@ public:
         for (auto &matrixString: _strings) {
             for (uint32_t n = 0; n < matrixString->num_pixels; n++) {
                 matrixString->pixels[n] = color;
-            }
-        }
-    }
-
-    void swap() {
-        for (auto &matrixString: _strings) {
-            
-            DoubleBufferedFastLEDString* dbfls = 
-                dynamic_cast<DoubleBufferedFastLEDString*>(matrixString.get());
-
-            if (dbfls) {
-                dbfls->swap();
             }
         }
     }

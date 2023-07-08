@@ -3,7 +3,6 @@
 
 #include <FastLED.h>
 #include <initializer_list>
-#include <Vector.h>
 
 #include "fastledmatrix.h"
 #include "ipixel.h"
