@@ -4,8 +4,6 @@
 #include <LittleFS.h>
 #include <stdint.h>
 #include <FastLED.h>
-#include "matrix.h"
-#include "matrixmanager.h"
 
 #include "scene/scene.h"
 #include "scene/elements/bitmapelement.h"
