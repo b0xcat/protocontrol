@@ -24,6 +24,7 @@ def main(source, target, env):
 
     # Ensure out directory exists
     out_dir = (here / '../../data/565').resolve()
+    out_dir.mkdir(exists_ok=True, parents=True)
     print("out dir:", out_dir)
     assert out_dir.is_dir()
 
