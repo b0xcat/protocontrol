@@ -366,6 +366,7 @@ void setup()
     etl::delegate<void(int)> buttonHandlerDelegate(buttonHandler);
     RemoteReceiver::setButtonHandler(buttonHandlerDelegate);
 
+    #ifdef USE_MAX7219
     // Face config
     for (uint i = 0; i < NUMBER_OF_DEVICES; i++){
         display.getPanel().setRotation(i, 1);
@@ -398,6 +399,8 @@ void setup()
         display.getPanel().write();
         delay(10);
     }
+
+    #endif // USE_MAX7219
 
     //   FastLED.addLeds((CLEDController*)&sidePanelLeft, (CRGB*)&sidePanelFramebuffer, NUM_LEDS_SIDEPANEL);
     //   FastLED.addLeds((CLEDController*)&sidePanelRight, (CRGB*)&sidePanelFramebuffer, NUM_LEDS_SIDEPANEL);
