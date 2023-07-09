@@ -1,215 +1,439 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <WiFi.h>
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
-#include <FS.h>
-#include <SPIFFS.h>
+#include <LittleFS.h>
 #include <stdint.h>
-#include "AsyncJson.h"
-#include "ArduinoJson.h"
-#include "wifi_credentials.h"
-#include "facestorage.h"
-#include "webserver.h"
-#include "matrix.h"
-#include "matrixmanager.h"
-#include "max7219painter.h"
+#include <FastLED.h>
 
-#define DELTA_E 0.5
-#define FACE_COLS 16 + 16 + 8 + 8 + 32 + 32
-#define FACE_ROWS 8
-#define FBSIZE FACE_COLS
-#define N_LAYERS 4
+#include "scene/scene.h"
+#include "scene/elements/bitmapelement.h"
+#include "scene/elements/adagfxelement.h"
+#include "scene/elements/targetfollowerelement.h"
 
-#define CS_PIN 18
-#define CLK_PIN 19
-#define MISO_PIN 2 //we do not use this pin just fill to match constructor
-#define MOSI_PIN 5
+#include "scene/visitors/elementprinter.h"
+#include "scene/visitors/elementrgbbitmapsetter.h"
+#include "scene/visitors/elementdrawer.h"
+#include "scene/visitors/elementupdater.h"
 
+#include "scene/modifiers/mirror.h"
+#include "scene/modifiers/rainbow.h"
+#include "scene/modifiers/blink.h"
+#include "scene/modifiers/coloroverride.h"
+
+#include "bitmaps.h"
+#include "displays/fastled/fastleddisplay.h"
+#include "displays/fastled/fastledstring.h"
+#include "displays/fastled/fastledmatrix.h"
+
+
+#include "crgbcanvas.h"
+
+#include "remotereceiver.h"
+
+// Debug enable
+bool debug = false;
+bool rainbowEnabled = false;
+CRGB overrideColor{0, 255, 0};
+
+// For synchronization of update and drawing loop
+SemaphoreHandle_t xBinarySemaphore;
+
+TaskHandle_t DrawingTask;
+TaskHandle_t UpdateTask;
+
+#ifdef USE_WS2812Matrix
+// Define the layout of our physical display
+FastLEDDisplay display {
+    new FastLEDString{
+        new WS2812<16, RGB>, {
+            new FastLEDMatrix{16, 8, 0, 0, 0},
+            new FastLEDMatrix{32, 8, 0, 16, 0},
+            new FastLEDMatrix{8, 8, 32, 8, 0},
+        }},
+    new FastLEDString{
+        new WS2812<17, RGB>, {
+            new FastLEDMatrix{16, 8, 64, 0, 2},
+            new FastLEDMatrix{32, 8, 48, 16, 2},
+            new FastLEDMatrix{8, 8, 40, 8, 2},
+        }},
+    new FastLEDString{
+        new WS2812B<21,RGB>, {
+            new FastLEDMatrix{8, 8, 24, 8, 0}
+        }
+    },
+    new FastLEDString{
+        new WS2812B<22,RGB>, {
+            new FastLEDMatrix{8, 8, 56, 8, 0}
+        }
+    }
+};
+#endif //USE_WS2812Matrix
+
+#ifdef USE_MAX7219
+#include "displays/max7219/max7219display.h"
+#define CS_PIN 19
+#define CLK_PIN 18
+#define MISO_PIN 2 // we do not use this pin just fill to match constructor
+#define MOSI_PIN 23
+#define NUMBER_OF_DEVICES 14
 SPIClass hspi(HSPI);
 
-Max72xxPanel face = Max72xxPanel(
+Max72xxPanel panel{
     CLK_PIN,
     MISO_PIN,
     MOSI_PIN,
     CS_PIN,
     &hspi,
-    NUMBER_OF_DEVICES, 1);
+    NUMBER_OF_DEVICES,
+    1};
 
-// The positions the parts of the face actually get drawn to on the physical display (the matrices in our case)
-const DrawPosNameMapping matrixPositions[] = {
-  {"eye_r", {0, 0}},
-  {"mouth_r", {16, 0}},
-  {"nose_r", {48, 0}},
-  {"nose_l", {56, 0}},
-  {"mouth_l", {64, 0}},
-  {"eye_l", {96, 0}},
+Max7219display display{panel};
+
+#define NUM_LEDS_SIDEPANEL 15 + 8 + 16 + 12
+// WS2812<21, GRB> sidePanelLeft;
+// WS2812<22, GRB> sidePanelRight;
+// CRGB sidePanelFramebuffer[NUM_LEDS_SIDEPANEL];
+
+#endif //USE_MAX7219
+
+
+ProtoControl::BitmapManager<256> bitmapManager;
+
+BlinkController blinkController(false, 250, 8000, 2000);
+
+Scene scene{
+    new Rainbow<TargetFollowerElement> {"eye_r_follower", 16, 8, 0, 0, {
+        new Blink<MirrorHorizontal<BitmapElement>>{blinkController, "eye_r"},
+    }},
+    new Rainbow<TargetFollowerElement> {"mouth_r_follower", 32, 8, 16, 0, {
+        new MirrorHorizontal<BitmapElement>{"mouth_r"},
+    }},
+    new Rainbow<TargetFollowerElement> {"nose_r_follower", 8, 8, 48, 0, {
+        new MirrorHorizontal<BitmapElement>{"nose_r"},
+    }},
+
+    new Rainbow<TargetFollowerElement> {"nose_l_follower", 8, 8, 56, 0, {
+        new BitmapElement{"nose_l"},
+    }},
+    new Rainbow<TargetFollowerElement> {"mouth_l_follower", 32, 8, 64, 0, {
+        new BitmapElement{"mouth_l"},
+    }},
+    new Rainbow<TargetFollowerElement> {"eye_l_follower", 16, 8, 96, 0, {
+        new Blink<BitmapElement>{blinkController, "eye_l"},
+    }},
+
+    // new Rainbow<ColorOverride<BitmapElement>>{"ear_r", 24, 8},
+    // new Rainbow<ColorOverride<BitmapElement>>{"ear_l", 56, 8}
+    
 };
 
-// Handles drawing the Matrix objects to the screen
-Max7219painter painter(face);
+volatile bool flipped = false;
+CRGBCanvas *framebuffer[]{
+    new CRGBCanvas(112, 8),
+    new CRGBCanvas(112, 8)};
 
-// Internal, hardware agnostic representation of the matrices
-// Basically just specialized bitmaps with some convenience functions
-// and animation stuff built in
-MatrixManager matrixmanager;
-Matrix eye_r("eye_r", 16, 8, N_LAYERS);
-Matrix eye_l("eye_l", 16, 8, N_LAYERS);
-Matrix nose_r("nose_r", 8, 8, N_LAYERS);
-Matrix nose_l("nose_l", 8, 8, N_LAYERS);
-Matrix mouth_r("mouth_r", 32, 8, N_LAYERS);
-Matrix mouth_l("mouth_l", 32, 8, N_LAYERS);
+// // Used to draw to the display
+ElementDrawer drawer[]{
+    ElementDrawer(*framebuffer[0]),
+    ElementDrawer(*framebuffer[1])};
 
-// The face that is actually drawn
-// TODO: refactor stuff that accesses this pointer
-uint8_t *framebuffer;// = matrixmanager.data; (can't set here yet since it's still uninitialized)
+// // Used to set bitmaps in the scene
+ElementRGBBitmapSetter normalfacesetter;
+ElementRGBBitmapSetter angryfacesetter;
+ElementRGBBitmapSetter nwnfacesetter;
+ElementRGBBitmapSetter uwufacesetter;
+ElementRGBBitmapSetter owofacesetter;
+ElementRGBBitmapSetter heartfacesetter;
+ElementRGBBitmapSetter arrowfacesetter;
 
-// Loaded from wifi_credentials.h
-extern const char *ssid;
-extern const char *password;
+// // Used to print a text representation of the scene
+// ElementPrinter ep(Serial);
 
-// Manages access to SPI flash for loading and storing faces
-FaceStorage facestorage(SPIFFS, FBSIZE);
+// // Used to update the elements in the scene
+ElementUpdater updater;
 
-// WebServer wraps the async server for convenience and cleaner setup
-AsyncWebServer asyncserver(4000);
-WebServer server(asyncserver, facestorage, matrixmanager, FBSIZE, framebuffer);
-
-void setupWiFI()
+unsigned long last = 0;
+void updateLoop(void *params)
 {
-  WiFi.begin(ssid, password);
 
-  if (WiFi.waitForConnectResult() != WL_CONNECTED)
-  {
-    Serial.println("Connection failed");
-    delay(1000);
-    return;
-  }
+    // For benchmarking
+    unsigned long before;
+    unsigned long after;
+    __attribute__((unused)) unsigned long delta;
 
-  Serial.print("Connected: ");
-  Serial.println(WiFi.localIP());
+    while (true)
+    {
 
-  delay(1000);
+        xSemaphoreTake(xBinarySemaphore, portMAX_DELAY);
+
+        before = micros();
+
+        // Swap buffers
+        flipped = !flipped;
+
+        // Serial.printf("Clearing %d \n", flipped);
+        framebuffer[flipped]->clear();
+
+        xSemaphoreGive(xBinarySemaphore);
+
+        unsigned long now = micros();
+        delta = now - last;
+
+        // Serial.printf("Loop took %d us\n", delta);
+
+        last = micros();
+
+        updater.setTimeDelta(micros());
+        updater.visit(&scene);
+
+        drawer[flipped].visit(&scene);
+
+        after = micros();
+        delta = after - before;
+
+        // Serial.printf("Updating took %d us\n", delta);
+    }
+}
+
+void drawLoop(void *params)
+{
+    __attribute__((unused)) unsigned long begin = 0;
+    __attribute__((unused)) unsigned long end = 0;
+    while (true)
+    {
+        begin = micros();
+
+        xSemaphoreTake(xBinarySemaphore, portMAX_DELAY);
+
+        display.clear();
+
+        // Move framebuffer to display
+        // Serial.printf("Drawing %d \n", !flipped);
+        auto &cur_framebuffer = framebuffer[!flipped];
+        for (uint32_t x = 0; x < cur_framebuffer->getWidth(); x++)
+        {
+            for (uint32_t y = 0; y < cur_framebuffer->getHeight(); y++)
+            {
+                display.setPixel(x, y, cur_framebuffer->getPixel(x, y));
+            }
+        }
+
+        display.show();
+
+        // delay(1000);
+
+        xSemaphoreGive(xBinarySemaphore);
+        delayMicroseconds(100);
+
+        end = micros();
+
+        // Serial.printf("drawloop took %d us\n", end - begin);
+    }
 }
 
 void setup()
 {
-  esp_log_level_set("*", ESP_LOG_VERBOSE);
-  Serial.begin(921600);
+    esp_log_level_set("*", ESP_LOG_VERBOSE);
+    Serial.begin(115200);
 
-  // Init Storage
-  if (!SPIFFS.begin())
-  {
-    Serial.setTimeout(100000);
-    Serial.println("Storage Mount Failed. Format? [y/n]");
-    while(true) {
-      if (Serial.available()) {
-        char response = Serial.read();
-        if (response == 'y') {
-          SPIFFS.format();
-          Serial.println("Storage Formatted");
-          ESP.restart();
-        } else {
-          Serial.println("Rebooting...");
-          ESP.restart();
+    // Print mac address
+    Serial.print("ESP Board MAC Address:  ");
+    Serial.println(WiFi.macAddress());
+
+    // Set up esp now remote
+    WiFi.mode(WIFI_STA);
+    RemoteReceiver::init();
+
+    // Set up littleFS
+    if (!LittleFS.begin(true))
+    {
+        Serial.println("LittleFS Mount Failed");
+        while (true)
+        {
         }
-      }
     }
-  }
 
-  // Register & configure matrices
-  matrixmanager.add(&eye_r);
-  matrixmanager.add(&eye_l);
-  matrixmanager.add(&nose_r);
-  matrixmanager.add(&nose_l);
-  matrixmanager.add(&mouth_r);
-  matrixmanager.add(&mouth_l);
-  matrixmanager.setMatrixBlink("eye_r", true);
-  matrixmanager.setMatrixBlink("eye_l", true);
-  matrixmanager.init(); // DO NOT FORGET omg
-  framebuffer = matrixmanager.data;
+    // Collect and load the bitmaps in the LITTLEFS /565 folder
+    bitmapManager.gather(LittleFS, "/565");
 
-  // Set the drawing positions of the matrices on the screen
-  painter.setNameMapping(matrixPositions);
+    // ep.visit(&scene);
 
-  setupWiFI();
+    // Define expressions
+    normalfacesetter
+        .add("eye_r", bitmapManager.get("/565/proto_eye"))
+        .add("eye_l", bitmapManager.get("/565/proto_eye"))
+        .add("nose_r", bitmapManager.get("/565/proto_nose"))
+        .add("nose_l", bitmapManager.get("/565/proto_nose"))
+        .add("mouth_r", bitmapManager.get("/565/proto_mouth"))
+        .add("mouth_l", bitmapManager.get("/565/proto_mouth"))
+        // .add("ear_l", bitmapManager.get("/565/proto_ear"))
+        // .add("ear_r", bitmapManager.get("/565/proto_ear"))
+        .visit(&scene);
 
-  Serial.println("Setting up server");
-  server.init(framebuffer);
-  Serial.println("Server setup complete");
+    // angryfacesetter
+    //     .add("eye_r", bitmapManager.get("/565/proto_eye_angry"))
+    //     .add("eye_l", bitmapManager.get("/565/proto_eye_angry"))
+    //     .add("nose_r", bitmapManager.get("/565/proto_nose_angry"))
+    //     .add("nose_l", bitmapManager.get("/565/proto_nose_angry"))
+    //     .add("mouth_r", bitmapManager.get("/565/proto_mouth_angry"))
+    //     .add("mouth_l", bitmapManager.get("/565/proto_mouth_angry"))
+    //     .add("ear_l", bitmapManager.get("/565/proto_ear"))
+    //     .add("ear_r", bitmapManager.get("/565/proto_ear"));
 
-  // Load default face
-  Serial.println("Loading default face");
-  int result = facestorage.loadface("boi", framebuffer);
-  if (result != 0)
-  {
-    Serial.println("Failed loading default face");
-  } else {
-    Serial.println("Setting default face");
-  }
+    // nwnfacesetter
+    //     .add("eye_r", bitmapManager.get("/565/proto_eye_n"))
+    //     .add("eye_l", bitmapManager.get("/565/proto_eye_n"))
+    //     .add("nose_r", bitmapManager.get("/565/proto_nose"))
+    //     .add("nose_l", bitmapManager.get("/565/proto_nose"))
+    //     .add("mouth_r", bitmapManager.get("/565/proto_mouth_w"))
+    //     .add("mouth_l", bitmapManager.get("/565/proto_mouth_w"))
+    //     .add("ear_l", bitmapManager.get("/565/proto_ear"))
+    //     .add("ear_r", bitmapManager.get("/565/proto_ear"));
 
-  matrixmanager.setFrame(framebuffer);
+    // uwufacesetter
+    //     .add("eye_r", bitmapManager.get("/565/proto_eye_u"))
+    //     .add("eye_l", bitmapManager.get("/565/proto_eye_u"))
+    //     .add("nose_r", bitmapManager.get("/565/proto_nose"))
+    //     .add("nose_l", bitmapManager.get("/565/proto_nose"))
+    //     .add("mouth_r", bitmapManager.get("/565/proto_mouth_w"))
+    //     .add("mouth_l", bitmapManager.get("/565/proto_mouth_w"))
+    //     .add("ear_l", bitmapManager.get("/565/proto_ear"))
+    //     .add("ear_r", bitmapManager.get("/565/proto_ear"));
 
-  Serial.println("Setup complete");
+    // owofacesetter
+    //     .add("eye_r", bitmapManager.get("/565/proto_eye_o"))
+    //     .add("eye_l", bitmapManager.get("/565/proto_eye_o"))
+    //     .add("nose_r", bitmapManager.get("/565/proto_nose"))
+    //     .add("nose_l", bitmapManager.get("/565/proto_nose"))
+    //     .add("mouth_r", bitmapManager.get("/565/proto_mouth_w"))
+    //     .add("mouth_l", bitmapManager.get("/565/proto_mouth_w"))
+    //     .add("ear_l", bitmapManager.get("/565/proto_ear"))
+    //     .add("ear_r", bitmapManager.get("/565/proto_ear"));
+
+    // heartfacesetter
+    //     .add("eye_r", bitmapManager.get("/565/proto_eye_heart"))
+    //     .add("eye_l", bitmapManager.get("/565/proto_eye_heart"))
+    //     .add("nose_r", bitmapManager.get("/565/proto_nose"))
+    //     .add("nose_l", bitmapManager.get("/565/proto_nose"))
+    //     .add("mouth_r", bitmapManager.get("/565/proto_mouth"))
+    //     .add("mouth_l", bitmapManager.get("/565/proto_mouth"))
+    //     .add("ear_l", bitmapManager.get("/565/proto_ear"))
+    //     .add("ear_r", bitmapManager.get("/565/proto_ear"));
+
+    // arrowfacesetter
+    //     .add("eye_r", bitmapManager.get("/565/proto_eye_arrow"))
+    //     .add("eye_l", bitmapManager.get("/565/proto_eye_arrow"))
+    //     .add("nose_r", bitmapManager.get("/565/proto_nose"))
+    //     .add("nose_l", bitmapManager.get("/565/proto_nose"))
+    //     .add("mouth_r", bitmapManager.get("/565/proto_mouth_angry"))
+    //     .add("mouth_l", bitmapManager.get("/565/proto_mouth_angry"))
+    //     .add("ear_l", bitmapManager.get("/565/proto_ear"))
+    //     .add("ear_r", bitmapManager.get("/565/proto_ear"));
+
+    // Setup button event handler
+    auto buttonHandler = [](int button)
+    {
+        Serial.print("Received button: ");
+        Serial.println(button);
+        switch (button)
+        {
+        case 3:
+            heartfacesetter.visit(&scene);
+            break;
+        case 4:
+            uwufacesetter.visit(&scene);
+            break;
+        case 5:
+            angryfacesetter.visit(&scene);
+            break;
+        case 6:
+            owofacesetter.visit(&scene);
+            break;
+        case 7:
+            nwnfacesetter.visit(&scene);
+            break;
+        case 8:
+            arrowfacesetter.visit(&scene);
+            break;
+        case 9:
+            normalfacesetter.visit(&scene);
+            break;
+        case 10:
+            rainbowEnabled = !rainbowEnabled;
+            break;
+        }
+    };
+    etl::delegate<void(int)> buttonHandlerDelegate(buttonHandler);
+    RemoteReceiver::setButtonHandler(buttonHandlerDelegate);
+
+    #ifdef USE_MAX7219
+    // Face config
+    for (uint i = 0; i < NUMBER_OF_DEVICES; i++){
+        display.getPanel().setRotation(i, 1);
+    }
+    display.getPanel().setRotation(13, 3);
+    display.getPanel().setRotation(12, 3);
+
+    display.getPanel().setPosition(13, 12, 0);
+    display.getPanel().setPosition(12, 13, 0);
+
+    display.setBrightness(32);
+
+    // Write settings
+    display.getPanel().write();
+
+    // Startup blink
+    for (uint i = 0; i < 3; i++) {
+        display.getPanel().fillScreen(1);
+        display.getPanel().write();
+        delay(100);
+        display.getPanel().fillScreen(0);
+        display.getPanel().write();
+        delay(100);
+    }
+
+    // Startup scan
+    for (uint i = 0; i < NUMBER_OF_DEVICES * 8; i++) {
+        display.getPanel().fillScreen(0);
+        display.getPanel().drawFastVLine(i, 0, 8, 1);
+        display.getPanel().write();
+        delay(10);
+    }
+
+    #endif // USE_MAX7219
+
+    //   FastLED.addLeds((CLEDController*)&sidePanelLeft, (CRGB*)&sidePanelFramebuffer, NUM_LEDS_SIDEPANEL);
+    //   FastLED.addLeds((CLEDController*)&sidePanelRight, (CRGB*)&sidePanelFramebuffer, NUM_LEDS_SIDEPANEL);
+
+    //   fill_solid((CRGB*)&sidePanelFramebuffer, NUM_LEDS_SIDEPANEL, CRGB {255, 0, 0});
+    //   FastLED.show();
+
+    xBinarySemaphore = xSemaphoreCreateBinary();
+
+    xTaskCreatePinnedToCore(
+        updateLoop,  /* Task function. */
+        "Task1",     /* name of task. */
+        10000,       /* Stack size of task */
+        NULL,        /* parameter of the task */
+        1,           /* priority of the task */
+        &UpdateTask, /* Task handle to keep track of created task */
+        0);          /* pin task to core 0 */
+
+    xTaskCreatePinnedToCore(
+        drawLoop,     /* Task function. */
+        "Task2",      /* name of task. */
+        10000,        /* Stack size of task */
+        NULL,         /* parameter of the task */
+        1,            /* priority of the task */
+        &DrawingTask, /* Task handle to keep track of created task */
+        1);           /* pin task to core 1 */
+
+    xSemaphoreGive(xBinarySemaphore);
 }
 
-
-uint32_t last = 0;
-uint32_t last_blink = 0;
-uint32_t blink_interval = 10000;
-int blink_randomness;
-bool blinking = false;
-uint32_t last_debug_print = 0;
-int last_dtime = 0;
-
+unsigned long prev = 0;
 void loop()
 {
-  uint32_t now = millis();
-
-  // Handle overflow, update next loop
-  if (now < last)
-  {
-    last = 0;
-    return;
-  }
-  
-  // Time delta in milliseconds
-  uint32_t deltatime = now - last;
-  last = now;
-
-  // Handle blinking
-  last_blink += deltatime;
-  if (last_blink > blink_interval)
-  {
-    if (!blinking)
-    {
-      blinking = true;
-      matrixmanager.blink();
-    }
-    if (blinking)
-    {
-      if (last_blink > blink_interval + 100)
-      {
-        last_blink = 0;
-        blink_interval = random(7000, 13000);
-        blinking = false;
-        matrixmanager.clearBlink();
-      }
-    }
-  }
-
-  // Animate face
-  matrixmanager.update(deltatime);
-
-  // Draw face to screen/matrices/whatever
-  matrixmanager.paint(painter);
-
-  // Debug prints
-  if (deltatime > last_dtime + 1 || deltatime < last_dtime - 1)
-  {
-    Serial.print("dtime: ");
-    Serial.println(deltatime);
-
-    last_dtime = deltatime;
-  }
+    Serial.printf("Free heap: %d\n", ESP.getFreeHeap());
+    delay(5000);
 }

@@ -1,0 +1,294 @@
+#ifndef __BITMAPS_HEADER_H__
+#define __BITMAPS_HEADER_H__
+
+#include <stdint.h>
+#include <etl/map.h>
+#include <FS.h>
+#include <FastLED.h>
+
+#include "ipixel.h"
+#include "colorconversion.h"
+
+namespace ProtoControl {
+	enum BitmapType: uint8_t {
+		ColMajor565
+	};
+
+	class IBitmap: public IPixelReadWriteable {
+	protected:
+		std::string path;
+	public:
+		IBitmap(const char* path)
+		: path(path)
+		{}
+
+
+		virtual void save() = 0;
+		virtual void load() = 0;
+		
+		std::string getPath() {
+			return path;
+		}
+	};
+
+	// Dumb wrapper around const uint16_t[] bitmaps
+	class Static565Bitmap: public IBitmap {
+	private:
+		std::unique_ptr<CRGB[]> crgb_buf;
+		const uint16_t* buf;
+		uint16_t w;
+		uint16_t h;
+
+	public:
+		Static565Bitmap(const uint16_t* bitmap, uint16_t w, uint16_t h)
+		: IBitmap("none")
+		, crgb_buf(std::make_unique<CRGB[]>(w * h))
+		, buf(bitmap)
+		, w(w)
+		, h(h) {
+			for(uint32_t i = 0; i < w * h; i++) {
+				convert565toCRGB(buf[i], crgb_buf[i]);
+			}
+		}
+
+		CRGB getPixel(uint16_t x, uint16_t y) const {
+			// Row major
+			return crgb_buf[x + y * w];
+		}
+
+		uint16_t getWidth() const {
+			return w;
+		}
+
+		uint16_t getHeight() const {
+			return h;
+		}
+
+		// Noops
+		// void setPixel(int16_t x, int16_t y, CRGB color) override {}
+		void clear() {}
+		void save() {}
+		void load() {}
+	};
+	
+
+	class FSBacked565Bitmap : public IBitmap {
+
+	private:
+		fs::FS &fs;
+
+		bool is_loaded;
+
+		uint16_t w {};
+		uint16_t h {};
+
+		uint16_t* buf;
+
+	public:
+		FSBacked565Bitmap(fs::FS &fs, const char* path)
+		: IBitmap(path)
+		, fs(fs)
+		, is_loaded(false)
+		{
+			if (fs.exists(this->path.c_str())) {
+				load();
+			} 
+		}
+
+		FSBacked565Bitmap(fs::FS &fs, const char* path, uint16_t w, uint16_t h)
+		: IBitmap(path)
+		, fs(fs)
+		, is_loaded(false)
+		{
+			this->w = w;
+			this->h = h;
+
+			if (fs.exists(this->path.c_str())) {
+				load();
+			} 
+		}
+
+		CRGB getPixel(uint16_t x, uint16_t y) const {
+			CRGB r;
+			convert565toCRGB(buf[x * h + y], r);
+			return r;
+		}
+
+		void setPixel(uint16_t x, uint16_t y, CRGB color) {
+			buf[x * h + y] = convertCRGBto565(color);
+		}
+
+		uint16_t getWidth() const {
+			return w;
+		}
+
+		uint16_t getHeight() const {
+			return h;
+		}
+
+		void clear() {
+			memset(buf, 0, w * h * sizeof(uint16_t));
+		}
+
+		void save() override {
+			File file = fs.open(path.c_str(), "w+");
+
+			// Write type
+			BitmapType cur_type = BitmapType::ColMajor565;
+			file.write((uint8_t*)&cur_type, 1);
+
+			// Write w x h
+			file.write((uint8_t*)&w, sizeof(uint16_t));
+			file.write((uint8_t*)&h, sizeof(uint16_t));
+
+			// Write image data
+			file.write((uint8_t*)buf, w * h * sizeof(uint16_t));
+		}
+
+		void load() override {
+			File file = fs.open(path.c_str());
+
+			// Read and check the header
+			BitmapType bmptype;
+			uint16_t w {};
+			uint16_t h {};
+			
+			file.read((uint8_t*)&bmptype, sizeof(bmptype));
+			file.read((uint8_t*)&w, sizeof(uint16_t));
+			file.read((uint8_t*)&h, sizeof(uint16_t));
+
+			bool shouldQuit = false;
+
+			if (bmptype != BitmapType::ColMajor565) {
+				Serial.print("Error: bitmap type not column major 565");
+				shouldQuit = true;
+			}
+
+			if (is_loaded) {
+				if (w != this->w) {
+					Serial.print("Error: stored width not equal to defined width");
+					shouldQuit = true;
+				}
+				if (h != this->h) {
+					Serial.print("Error: stored height not equal to defined height");
+					shouldQuit = true;
+				}
+			} 
+
+			if (shouldQuit) {
+				return;
+			}
+
+			if (!is_loaded) {
+				this->w = w;
+				this->h = h;
+				is_loaded = true;
+				buf = new uint16_t[w * h];
+			}
+
+			// Read file contents
+			file.read((uint8_t*)buf, w * h * sizeof(uint16_t));
+		}
+	};
+
+
+
+	template <ssize_t size>
+	class BitmapManager {
+	private:
+		etl::map<std::string, IBitmap*, size> bitmaps;
+
+	public:
+		void add(IBitmap* bitmap) {
+			bitmaps[bitmap->getPath()] = bitmap;
+		}
+
+		IBitmap* get(std::string path) {
+			return bitmaps.at(path);
+		}
+
+
+		void gather(fs::FS &fs, const char* dirname) {
+			Serial.printf("Gathering files from: %s\n", dirname);
+
+			File root = fs.open(dirname);
+			if (!root) {
+				Serial.println("- failed to open directory");
+				return;
+			}
+			if (!root.isDirectory()) {
+				Serial.println("- not a directory");
+				return;
+			}
+
+			File file = root.openNextFile();
+			while(file) {
+				if (!file.isDirectory()) {
+					Serial.printf("Loading file: %s ", file.name());
+
+					BitmapType curType;
+					file.read((uint8_t*)&curType, 1);
+					// file.close();
+
+					switch(curType) {
+					case ColMajor565:
+						Serial.println("- Column major 565");
+						this->add(new FSBacked565Bitmap(fs, file.path()));
+						break;
+					}
+				}
+				file = root.openNextFile();
+			}
+		}
+	};
+}
+
+
+
+// 'eye', 16x8px
+const uint16_t epd_bitmap_eye [] = {
+	0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 
+	0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x8800, 0xb800, 0xd800, 0xe000, 0xe000, 0x9800, 0x0000, 0x0000, 0x0000, 0x0000, 
+	0x0000, 0x0000, 0x0000, 0x0000, 0x5800, 0xe000, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0x2800, 0x0000, 0x0000, 0x0000, 
+	0x0000, 0x0000, 0x0000, 0x8800, 0xf000, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0x8800, 0x0000, 0x0000, 0x0000, 
+	0x0000, 0x0000, 0x0000, 0xf800, 0xf800, 0xd800, 0x9800, 0x7800, 0x7000, 0xd800, 0xf800, 0xf800, 0xb000, 0x0000, 0x0000, 0x0000, 
+	0x0000, 0x0000, 0x0000, 0x7000, 0x7000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0xb000, 0xc800, 0x3800, 0x0000, 0x0000, 0x0000, 
+	0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 
+	0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000
+};
+// 'mouth', 32x8px
+const uint16_t epd_bitmap_mouth [] = {
+	0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 
+	0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 
+	0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0800, 0x4800, 0x7000, 0x4800, 0x0000, 0x0000, 
+	0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0800, 0x6000, 0x4800, 0x0000, 0x0000, 0x0000, 
+	0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x2800, 0x7800, 0xa000, 0xc800, 0xd800, 0xf000, 0xf800, 0xf800, 0xf800, 0x6800, 0x0000, 
+	0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x4000, 0xb800, 0xf800, 0xf800, 0xf800, 0xe000, 0x5000, 0x0000, 
+	0x0000, 0x0000, 0x0000, 0x5800, 0xc800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xe000, 0xb800, 0xf800, 0xf800, 0x9000, 
+	0x0800, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x6800, 0xc000, 0xf800, 0xf800, 0xf800, 0xc800, 0xe800, 0xf800, 0xf800, 0x0000, 
+	0x0000, 0x0000, 0xb800, 0xf800, 0xf800, 0xf800, 0xc000, 0x9000, 0x6000, 0x4000, 0x0800, 0x0000, 0x0000, 0x9000, 0xf800, 0xf800, 
+	0xf800, 0xe000, 0xc000, 0xb800, 0xb000, 0xd800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xb000, 0x0000, 
+	0xc000, 0xe800, 0xf800, 0xf800, 0x9800, 0x1000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x6000, 0xd000, 
+	0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xe800, 0x8800, 0x2000, 0x5000, 0x7000, 0x7000, 0x3800, 0x0000, 0x0000, 0x0000, 
+	0xf800, 0xf800, 0xe000, 0x2800, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 
+	0x0000, 0x4000, 0x7000, 0x7800, 0x8000, 0x5800, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 
+	0x8000, 0x9000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 
+	0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000
+};
+// 'nose', 8x8px
+const uint16_t epd_bitmap_nose [] = {
+	0xa800, 0xf800, 0xf800, 0xf800, 0x7800, 0x0000, 0x0000, 0x0000, 0xb000, 0xf800, 0xd800, 0xd000, 0x3000, 0x0000, 0x0000, 0x0000, 
+	0xc000, 0xf800, 0x6800, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0xc800, 0xf800, 0x5800, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 
+	0xe000, 0xf800, 0x4000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x8800, 0xb800, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 
+	0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000
+};
+
+// Array of all bitmaps for convenience. (Total bytes used to store images in PROGMEM = 496)
+// int epd_bitmap_allArray_LEN = 3;
+// const uint16_t* epd_bitmap_allArray[3] = {
+// 	epd_bitmap_eye,
+// 	epd_bitmap_mouth,
+// 	epd_bitmap_nose
+// };
+
+#endif
