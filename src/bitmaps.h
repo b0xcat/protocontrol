@@ -233,7 +233,7 @@ namespace ProtoControl {
 					switch(curType) {
 					case ColMajor565:
 						Serial.println("- Column major 565");
-						this->add(new FSBacked565Bitmap(fs, file.name()));
+						this->add(new FSBacked565Bitmap(fs, file.path()));
 						break;
 					}
 				}
