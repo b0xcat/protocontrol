@@ -245,7 +245,7 @@ void setup()
     RemoteReceiver::init();
 
     // Set up littleFS
-    if (!LittleFS.begin(true))
+    if (!LittleFS.begin(false, ""))
     {
         Serial.println("LittleFS Mount Failed");
         while (true)
